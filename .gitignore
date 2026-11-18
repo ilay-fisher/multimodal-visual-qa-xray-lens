@@ -19,3 +19,6 @@ dist/
 
 # Agent worktrees
 .claude/
+
+# Local screenshot and log artifacts
+.playwright-mcp/
