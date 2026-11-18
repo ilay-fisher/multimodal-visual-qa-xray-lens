@@ -40,13 +40,13 @@
 
   <h2>Wave 1 - parallel, file-disjoint</h2>
   <div class="wave">
-    <div class="card"><h3>agent-cv <span class="tag wip">in progress</span></h3>
+    <div class="card"><h3>agent-cv <span class="tag done">merged</span></h3>
       <code>feat/cv-pipeline</code>
       <ul><li>app/cv_pipeline.py</li><li>scripts/generate_samples.py + samples/</li><li>tests/test_pipeline.py</li></ul></div>
-    <div class="card"><h3>agent-vlm <span class="tag wip">changes requested</span></h3>
+    <div class="card"><h3>agent-vlm <span class="tag done">merged</span></h3>
       <code>feat/vlm-client</code>
       <ul><li>app/schemas.py, app/config.py</li><li>app/vlm_client.py (demo/local/cloud)</li><li>tests/test_vlm.py, tests/test_schemas.py</li></ul></div>
-    <div class="card"><h3>agent-frontend <span class="tag wip">in progress</span></h3>
+    <div class="card"><h3>agent-frontend <span class="tag done">merged</span></h3>
       <code>feat/frontend</code>
       <ul><li>Vite + React + TS scaffold</li><li>XRaySlider, DiagnosisPanel, Toolbar</li><li>Vitest component tests, mock API</li></ul></div>
     <div class="card"><h3>agent-infra <span class="tag done">merged</span></h3>
@@ -56,7 +56,7 @@
 
   <h2>Wave 2 - after wave 1 merged</h2>
   <div class="wave">
-    <div class="card"><h3>agent-api <span class="tag todo">pending</span></h3>
+    <div class="card"><h3>agent-api <span class="tag wip">in progress</span></h3>
       <code>feat/api</code>
       <ul><li>app/main.py (inspect, analyze-roi SSE, cost guards)</li><li>app/benchmark.py</li><li>tests/test_api.py</li></ul></div>
     <div class="card"><h3>manager <span class="tag todo">pending</span></h3>
@@ -66,7 +66,10 @@
   <h2>PR log</h2>
   <table><tr><th>PR</th><th>Branch</th><th>Status</th><th>Review notes</th></tr>
     <tr><td>#1</td><td>feat/infra</td><td class="done">merged</td><td>TDD order ok. Docker job red until samples/ land (expected).</td></tr>
-    <tr><td>#2</td><td>feat/vlm-client</td><td class="wip">changes requested</td><td>Rebase on pyproject, public docstrings, no tracebacks on SDK errors.</td></tr>
+    <tr><td>#2</td><td>feat/vlm-client</td><td class="done">merged</td><td>After fixes: public docstrings, no tracebacks on SDK errors, StrEnum. 50 tests.</td></tr>
+    <tr><td>#3</td><td>feat/frontend</td><td class="done">merged</td><td>Screenshots reviewed (1440px, 375px). Styled file pickers requested and applied.</td></tr>
+    <tr><td>#4</td><td>feat/cv-pipeline</td><td class="done">merged</td><td>Manager re-ran red test commit and overlays. E501 + brand rename fixed. 75 tests.</td></tr>
+    <tr><td>-</td><td>fix/frontend-docker</td><td class="wip">in progress</td><td>Rollup "nested too deeply" on node:22-alpine; build stage moves to node:22-slim.</td></tr>
   </table>
 </main>
 </body>
