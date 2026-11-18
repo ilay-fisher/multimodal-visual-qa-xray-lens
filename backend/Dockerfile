@@ -24,5 +24,7 @@ USER appuser
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"
-# Trust X-Forwarded-For from the nginx frontend so per-IP rate limiting sees real client IPs.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips=*"]
+# Proxy headers are only honoured from FORWARDED_ALLOW_IPS (uvicorn env var); safe default is
+# loopback. docker-compose widens it because only the nginx frontend can reach the backend.
+ENV FORWARDED_ALLOW_IPS=127.0.0.1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
