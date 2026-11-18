@@ -1,7 +1,7 @@
 // Types mirroring docs/CONTRACTS.md sections 4 and 5.
-
 export type Severity = "low" | "medium" | "high" | "critical";
 export type VlmBackend = "demo" | "local" | "cloud";
+export type ErrorCode = "rate_limited" | "budget_exceeded" | "vlm_error" | "invalid_output";
 
 export interface DefectReport {
   defect_category: string;
@@ -11,15 +11,7 @@ export interface DefectReport {
   recommended_action: string;
 }
 
-export interface BoxOut {
-  id: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  area: number;
-  est_tokens: number;
-}
+export interface BoxOut { id: number; x: number; y: number; w: number; h: number; area: number; est_tokens: number }
 
 export interface InspectResponse {
   preset_id: string | null;
@@ -36,21 +28,9 @@ export interface InspectResponse {
   cv_time_ms: number;
 }
 
-export interface PresetOut {
-  id: string;
-  label: string;
-  domain_context: string;
-}
+export interface PresetOut { id: string; label: string; domain_context: string }
 
-export type ErrorCode = "rate_limited" | "budget_exceeded" | "vlm_error" | "invalid_output";
-
-export interface ResultData {
-  report: DefectReport;
-  vlm_time_ms: number;
-  backend: string;
-  roi_tokens: number;
-  cached: boolean;
-}
+export interface ResultData { report: DefectReport; vlm_time_ms: number; backend: string; roi_tokens: number; cached: boolean }
 
 /** One parsed server-sent event from POST /api/analyze-roi. */
 export type SseEvent =
