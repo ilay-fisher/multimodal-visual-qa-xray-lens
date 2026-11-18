@@ -18,6 +18,7 @@ from openai import AsyncOpenAI
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.cv_pipeline import PAIR_GAP, PAIR_GAP_COLOR
 from app.schemas import DefectReport, Severity
 
 logger = logging.getLogger(__name__)
@@ -42,18 +43,24 @@ class VLMClient(Protocol):
 # domain -> ["category|allowed severities|evidence|action"]; the demo picks one by hash.
 RULES = {
     "pcb": [
-        "missing_component|high critical|Empty pads where a part is expected.|Reflow, place part.",
-        "solder_bridge|medium high|Bright blob joining adjacent pads.|Remove bridge, re-inspect.",
+        "missing_component|high critical|Part missing on the right; only bare pads remain.|"
+        "Reflow, place part.",
+        "solder_bridge|medium high|A bright metal blob now bridges two adjacent pads.|"
+        "Remove bridge, re-inspect.",
     ],
     "aerial": [
-        "irrigation_stress|medium high|Discolored, drier vegetation patch.|Check irrigation lines.",
-        "pest_damage|low medium|Thinning canopy with speckled texture.|Scout and treat locally.",
+        "irrigation_stress|medium high|Vegetation turned yellow-brown versus the baseline.|"
+        "Check irrigation lines.",
+        "pest_damage|low medium|The canopy is thinner and speckled versus the baseline.|"
+        "Scout and treat locally.",
     ],
     "ui": [
-        "clipped_element|medium high|Element is cut off at its container.|Fix overflow or sizing.",
-        "misalignment|low medium|Element is off its neighbors' grid.|Restore the alignment.",
+        "clipped_element|medium high|Element is cut off in the target but whole in the baseline.|"
+        "Fix overflow or sizing.",
+        "misalignment|low medium|The element sits off its neighbors' grid versus the baseline.|"
+        "Restore the alignment.",
     ],
-    "generic": ["visual_anomaly|low medium high|Region differs from baseline.|Review manually."],
+    "generic": ["visual_anomaly|low medium high|The region differs from the baseline.|Review."],
 }
 
 
@@ -66,8 +73,10 @@ def build_prompt(domain_context: str) -> str:
     )
     severities = ", ".join(s.value for s in Severity)
     return (
-        "You are a visual inspection assistant. The image is a cropped region of interest "
-        f"that differs from a baseline. {hint}\n"
+        "You are a visual inspection assistant. The image shows one region of interest twice, "
+        "separated by a gray gap: the LEFT half is the expected baseline and the RIGHT half is "
+        "the current target. Describe what changed from left to right, including anything "
+        f"that is missing on the right or newly present. {hint}\n"
         "Reply with ONE JSON object and nothing else: no prose, no markdown, no code fences.\n"
         'Schema: {"defect_category": str (1-64 chars, snake_case), '
         f'"severity": one of [{severities}], "confidence": float 0..1, '
@@ -105,26 +114,56 @@ class DemoVLMClient:
     name = "demo"
     delay_s = 0.015
 
+    @staticmethod
+    def _split(img: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+        """Return (baseline, target) halves of a composite, or None when there is no gap."""
+        half, odd = divmod(img.shape[1] - PAIR_GAP, 2)
+        gap = img[:, half : half + PAIR_GAP].astype(int)
+        if half < 1 or odd or np.abs(gap - PAIR_GAP_COLOR).max() > 2:
+            return None
+        return img[:, :half], img[:, half + PAIR_GAP :]
+
+    @staticmethod
+    def _stats(img: np.ndarray) -> dict[str, float]:
+        """Cheap pixel fractions: dark body, bright metal, yellow/brown, foreground."""
+        hue, sat, val = np.moveaxis(cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float), 2, 0)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(float)
+        return {
+            "dark": float((val < 70).mean()),
+            "metal": float(((sat < 60) & (val > 170)).mean()),
+            "yellow": float(((hue > 8) & (hue < 35) & (sat > 80)).mean()),
+            "fg": float((abs(gray - np.median(gray)) > 40).mean()),
+        }
+
+    def _classify(self, key: str, pair: tuple[np.ndarray, np.ndarray]) -> str | None:
+        """Pick a category by comparing baseline and target halves; None for unknown domains."""
+        a, b = self._stats(pair[0]), self._stats(pair[1])
+        d = {k: b[k] - a[k] for k in a}
+        if key == "pcb":
+            return "solder_bridge" if d["metal"] > -d["dark"] else "missing_component"
+        if key == "aerial":
+            return "irrigation_stress" if d["yellow"] > 0.2 else "pest_damage"
+        if key == "ui":
+            return "clipped_element" if d["fg"] < -0.1 else "misalignment"
+        return None
+
     def _report(self, image_png: bytes, domain_context: str) -> DefectReport:
         key = domain_context.strip().lower()
         seed = int.from_bytes(hashlib.sha256(image_png + b"|" + key.encode()).digest()[:8], "big")
         img = cv2.imdecode(np.frombuffer(image_png, np.uint8), cv2.IMREAD_COLOR)
-        mean: tuple[float, ...] = (0.0, 0.0, 0.0)
-        edge, aspect = 0.0, 1.0
-        if img is not None:
-            mean = tuple(float(v) for v in img.reshape(-1, 3).mean(axis=0))
-            edge = float((cv2.Canny(img, 100, 200) > 0).mean())
-            aspect = img.shape[1] / img.shape[0]
+        pair = self._split(img) if img is not None else None
+        edge = float((cv2.Canny(img, 100, 200) > 0).mean()) if img is not None else 0.0
         rules = RULES.get(key, RULES["generic"])
-        category, sevs, evidence, action = rules[seed % len(rules)].split("|")
+        chosen = f"{self._classify(key, pair) if pair else None}|"
+        rule = next((r for r in rules if r.startswith(chosen)), rules[seed % len(rules)])
+        category, sevs, evidence, action = rule.split("|")
         severity = sevs.split()[(seed >> 16) % len(sevs.split())]
         conf = 0.55 + 0.42 * (0.6 * min(edge * 4, 1.0) + 0.4 * ((seed >> 8) % 100) / 100)
         return DefectReport(
             defect_category=category,
             severity=Severity(severity),
             confidence=round(min(max(conf, 0.55), 0.97), 2),
-            visual_evidence=f"{evidence} Mean BGR {mean[0]:.0f}/{mean[1]:.0f}/{mean[2]:.0f}, "
-            f"edge density {edge:.2f}, aspect {aspect:.2f}.",
+            visual_evidence=evidence,
             recommended_action=action,
         )
 

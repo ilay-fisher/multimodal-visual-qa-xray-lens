@@ -21,6 +21,8 @@ _FLOOR_STRICT, _FLOOR_LOOSE = 40.0, 6.0
 _C_STRICT, _C_LOOSE = 8, 2
 _ADAPTIVE_BLOCK = 101
 _HEATMAP_ALPHA = 0.55
+# Width and gray level of the separator between the two halves of a ROI pair.
+PAIR_GAP, PAIR_GAP_COLOR = 8, 128
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,13 @@ def crop(image: np.ndarray, box: BoundingBox) -> np.ndarray:
     return image[y0 : max(y0, min(h, box.y + box.h)), x0 : max(x0, min(w, box.x + box.w))].copy()
 
 
+def compose_pair(baseline: np.ndarray, target: np.ndarray, box: BoundingBox) -> np.ndarray:
+    """Place the baseline and target crops of ``box`` side by side, separated by a gray gap."""
+    left, right = crop(baseline, box), crop(target, box)
+    gap = np.full((left.shape[0], PAIR_GAP, 3), PAIR_GAP_COLOR, dtype=np.uint8)
+    return np.hstack([left, gap, right])
+
+
 def _union(a: BoundingBox, b: BoundingBox) -> BoundingBox:
     x0, y0 = min(a.x, b.x), min(a.y, b.y)
     return BoundingBox(x0, y0, max(a.x + a.w, b.x + b.w) - x0, max(a.y + a.h, b.y + b.h) - y0)
@@ -86,12 +95,9 @@ def _union(a: BoundingBox, b: BoundingBox) -> BoundingBox:
 
 def _touches(a: BoundingBox, b: BoundingBox, gap: int) -> bool:
     """True if the boxes overlap or are separated by at most ``gap`` pixels."""
-    return (
-        a.x <= b.x + b.w + gap
-        and b.x <= a.x + a.w + gap
-        and a.y <= b.y + b.h + gap
-        and b.y <= a.y + a.h + gap
-    )
+    dx = max(a.x, b.x) - min(a.x + a.w, b.x + b.w)
+    dy = max(a.y, b.y) - min(a.y + a.h, b.y + b.h)
+    return dx <= gap and dy <= gap
 
 
 def merge_boxes(boxes: list[BoundingBox], gap: int = 0) -> list[BoundingBox]:

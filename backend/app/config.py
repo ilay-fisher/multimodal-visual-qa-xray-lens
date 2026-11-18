@@ -7,8 +7,6 @@ from typing import Annotated, Literal
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-DEFAULT_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
-
 
 class Settings(BaseSettings):
     """Runtime configuration, read from environment variables and an optional .env file."""
@@ -31,7 +29,7 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
-    samples_dir: Path = DEFAULT_SAMPLES_DIR
+    samples_dir: Path = Path(__file__).resolve().parent.parent / "samples"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

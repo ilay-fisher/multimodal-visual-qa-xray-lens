@@ -18,9 +18,7 @@ AA, f32 = cv2.LINE_AA, np.float32
 rect = partial(cv2.rectangle, thickness=-1)
 
 
-def text(
-    img: np.ndarray, s: str, org: tuple[int, int], scale: float, color, thick: int = 1
-) -> None:
+def text(img: np.ndarray, s: str, org: tuple[int, int], scale: float, color, thick=1) -> None:
     """Anti-aliased label."""
     cv2.putText(img, s, org, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, AA)
 
@@ -140,13 +138,11 @@ def generate_all(out_dir: Path) -> list[dict[str, object]]:
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(SEED + 99)
     presets: list[dict[str, object]] = []
-    for pid, label, context, expected, scene in PRESETS:
+    for pid, label, ctx, n, scene in PRESETS:
         target = scene(True).astype(f32) + rng.normal(0, NOISE_SIGMA, (H, W, 3))
         cv2.imwrite(str(out_dir / f"{pid}_baseline.png"), scene(False))
         cv2.imwrite(str(out_dir / f"{pid}_target.png"), np.clip(target, 0, 255).astype(np.uint8))
-        presets.append(
-            {"id": pid, "label": label, "domain_context": context, "expected_defects": expected}
-        )
+        presets.append({"id": pid, "label": label, "domain_context": ctx, "expected_defects": n})
         logger.info("wrote %s pair (%dx%d)", pid, W, H)
     (out_dir / "presets.json").write_text(json.dumps(presets, indent=2) + "\n")
     return presets
