@@ -147,11 +147,18 @@ describe("instrument readout", () => {
     expect(document.querySelector(".caret")).toBeNull();
   });
 
+  it("never lags a live stream: pacing applies to the simulated demo only", () => {
+    const raw = '{"defect_category":"solder_bridge","severity":"high"}';
+    const { rerender } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "" }} telemetry={telemetry} simulated={false} />);
+    rerender(<DiagnosisPanel diagnosis={{ status: "streaming", raw }} telemetry={telemetry} simulated={false} />);
+    expect(within(row("severity")).getByText("high")).toBeInTheDocument();
+  });
+
   it("reveals text that arrives in one burst at a readable pace, then settles on result.report", () => {
     vi.useFakeTimers();
     const full = '{"defect_category":"missing_component","severity":"critical","confidence":0.92,"visual_evidence":"Pads at U3 are bare.","recommended_action":"Reflow and place the part."}';
-    const { rerender, container } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "" }} telemetry={telemetry} />);
-    rerender(<DiagnosisPanel diagnosis={{ ...done, raw: full }} telemetry={telemetry} />);
+    const { rerender, container } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "" }} telemetry={telemetry} simulated />);
+    rerender(<DiagnosisPanel diagnosis={{ ...done, raw: full }} telemetry={telemetry} simulated />);
     expect(row("recommended_action")).toHaveAttribute("data-state", "empty");
     expect(container.querySelector("[aria-busy]")).toHaveAttribute("aria-busy", "true");
     for (let i = 0; i < 80; i++) act(() => void vi.advanceTimersByTime(16)); // each tick re-arms the next
@@ -191,9 +198,23 @@ describe("specimen flight", () => {
     fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
     expect(animate).toHaveBeenCalledTimes(1);
     const [frames, opts] = animate.mock.calls[0];
-    expect(frames[0].transform).toBe("translate(-360px, -470px) scale(0.25, 0.3333333333333333)");
+    // uniform scale (the smaller ratio), centre to centre: no stretch
+    expect(frames[0].transform).toBe("translate(-450px, -500px) scale(0.25)");
     expect(frames[1].transform).toBe("none");
     expect(opts.easing).toMatch(/^linear\(/);
+    // the landing never overshoots the slot
+    const peak = Math.max(...[...opts.easing.matchAll(/-?\d*\.?\d+/g)].map((m) => Number(m[0])));
+    expect(peak).toBeLessThanOrEqual(1);
+  });
+
+  it("skips the flight when the slot is off screen, without scrolling", () => {
+    const scroll = vi.fn();
+    Object.assign(window, { scrollTo: scroll });
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(400); // slot top is 500
+    render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent }} telemetry={telemetry} />);
+    fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
+    expect(animate).not.toHaveBeenCalled();
+    expect(scroll).not.toHaveBeenCalled();
   });
 
   it("does not fly under reduced motion or without a source rect", () => {
