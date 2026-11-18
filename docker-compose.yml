@@ -30,7 +30,8 @@ services:
     build: ./frontend
     image: xray-frontend:latest
     ports:
-      - "3000:80"
+      # Host port is configurable: FRONTEND_PORT=3999 docker compose up (default 3000).
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy

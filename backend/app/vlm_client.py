@@ -42,18 +42,32 @@ class VLMClient(Protocol):
 # domain -> ["category|allowed severities|evidence|action"]; the demo picks one by hash.
 RULES = {
     "pcb": [
-        "missing_component|high critical|Empty pads where a part is expected.|Reflow, place part.",
-        "solder_bridge|medium high|Bright blob joining adjacent pads.|Remove bridge, re-inspect.",
+        "missing_component|high critical|"
+        "A component present in the baseline is gone; only bare pads remain in the target.|"
+        "Reflow, place part.",
+        "solder_bridge|medium high|"
+        "A bright metallic blob now joins two adjacent pads that were separate in the baseline.|"
+        "Remove bridge, re-inspect.",
     ],
     "aerial": [
-        "irrigation_stress|medium high|Discolored, drier vegetation patch.|Check irrigation lines.",
-        "pest_damage|low medium|Thinning canopy with speckled texture.|Scout and treat locally.",
+        "irrigation_stress|medium high|"
+        "The vegetation turned yellow-brown compared with the healthy green baseline.|"
+        "Check irrigation lines.",
+        "pest_damage|low medium|"
+        "The canopy looks thinner and speckled compared with the baseline.|"
+        "Scout and treat locally.",
     ],
     "ui": [
-        "clipped_element|medium high|Element is cut off at its container.|Fix overflow or sizing.",
-        "misalignment|low medium|Element is off its neighbors' grid.|Restore the alignment.",
+        "clipped_element|medium high|"
+        "The element is cut off at its container edge in the target; the baseline shows it whole.|"
+        "Fix overflow or sizing.",
+        "misalignment|low medium|"
+        "The element sits off its neighbors' grid compared with the baseline.|"
+        "Restore the alignment.",
     ],
-    "generic": ["visual_anomaly|low medium high|Region differs from baseline.|Review manually."],
+    "generic": [
+        "visual_anomaly|low medium high|The region differs from the baseline.|Review manually."
+    ],
 }
 
 
@@ -66,8 +80,10 @@ def build_prompt(domain_context: str) -> str:
     )
     severities = ", ".join(s.value for s in Severity)
     return (
-        "You are a visual inspection assistant. The image is a cropped region of interest "
-        f"that differs from a baseline. {hint}\n"
+        "You are a visual inspection assistant. The image shows one region of interest twice, "
+        "separated by a gray gap: the LEFT half is the expected baseline and the RIGHT half is "
+        "the current target. Describe what changed from left to right, including anything "
+        f"that is missing on the right or newly present. {hint}\n"
         "Reply with ONE JSON object and nothing else: no prose, no markdown, no code fences.\n"
         'Schema: {"defect_category": str (1-64 chars, snake_case), '
         f'"severity": one of [{severities}], "confidence": float 0..1, '
@@ -105,26 +121,64 @@ class DemoVLMClient:
     name = "demo"
     delay_s = 0.015
 
+    @staticmethod
+    def _split(img: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+        """Return (baseline, target) halves of a composite, or None when there is no gap."""
+        width = img.shape[1] - 8
+        if width < 2 or width % 2:
+            return None
+        gap = img[:, width // 2 : width // 2 + 8].astype(int)
+        return (
+            (img[:, : width // 2], img[:, width // 2 + 8 :])
+            if int(np.abs(gap - 128).max()) <= 2
+            else None
+        )
+
+    @staticmethod
+    def _stats(img: np.ndarray) -> dict[str, float]:
+        """Cheap pixel fractions: dark body, bright metal, yellow/brown, foreground."""
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
+        hue, sat, val = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(float)
+        return {
+            "dark": float((val < 70).mean()),
+            "metal": float(((sat < 60) & (val > 170)).mean()),
+            "yellow": float(((hue > 8) & (hue < 35) & (sat > 80)).mean()),
+            "fg": float((abs(gray - np.median(gray)) > 40).mean()),
+        }
+
+    def _classify(self, key: str, pair: tuple[np.ndarray, np.ndarray]) -> str | None:
+        """Pick a category by comparing baseline and target halves; None for unknown domains."""
+        a, b = self._stats(pair[0]), self._stats(pair[1])
+        if key == "pcb":
+            return (
+                "solder_bridge"
+                if b["metal"] - a["metal"] > a["dark"] - b["dark"]
+                else "missing_component"
+            )
+        if key == "aerial":
+            return "irrigation_stress" if b["yellow"] - a["yellow"] > 0.2 else "pest_damage"
+        if key == "ui":
+            return "clipped_element" if a["fg"] - b["fg"] > 0.1 else "misalignment"
+        return None
+
     def _report(self, image_png: bytes, domain_context: str) -> DefectReport:
         key = domain_context.strip().lower()
         seed = int.from_bytes(hashlib.sha256(image_png + b"|" + key.encode()).digest()[:8], "big")
         img = cv2.imdecode(np.frombuffer(image_png, np.uint8), cv2.IMREAD_COLOR)
-        mean: tuple[float, ...] = (0.0, 0.0, 0.0)
-        edge, aspect = 0.0, 1.0
-        if img is not None:
-            mean = tuple(float(v) for v in img.reshape(-1, 3).mean(axis=0))
-            edge = float((cv2.Canny(img, 100, 200) > 0).mean())
-            aspect = img.shape[1] / img.shape[0]
+        pair = self._split(img) if img is not None else None
+        edge = float((cv2.Canny(img, 100, 200) > 0).mean()) if img is not None else 0.0
         rules = RULES.get(key, RULES["generic"])
-        category, sevs, evidence, action = rules[seed % len(rules)].split("|")
+        chosen = self._classify(key, pair) if pair else None
+        picked = [r for r in rules if r.startswith(f"{chosen}|")] if chosen else []
+        category, sevs, evidence, action = (picked or [rules[seed % len(rules)]])[0].split("|")
         severity = sevs.split()[(seed >> 16) % len(sevs.split())]
         conf = 0.55 + 0.42 * (0.6 * min(edge * 4, 1.0) + 0.4 * ((seed >> 8) % 100) / 100)
         return DefectReport(
             defect_category=category,
             severity=Severity(severity),
             confidence=round(min(max(conf, 0.55), 0.97), 2),
-            visual_evidence=f"{evidence} Mean BGR {mean[0]:.0f}/{mean[1]:.0f}/{mean[2]:.0f}, "
-            f"edge density {edge:.2f}, aspect {aspect:.2f}.",
+            visual_evidence=evidence,
             recommended_action=action,
         )
 

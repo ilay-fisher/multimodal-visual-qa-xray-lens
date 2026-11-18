@@ -21,6 +21,8 @@ _FLOOR_STRICT, _FLOOR_LOOSE = 40.0, 6.0
 _C_STRICT, _C_LOOSE = 8, 2
 _ADAPTIVE_BLOCK = 101
 _HEATMAP_ALPHA = 0.55
+# Width and gray level of the separator between the two halves of a ROI pair.
+PAIR_GAP, PAIR_GAP_COLOR = 8, 128
 
 
 @dataclass(frozen=True)
@@ -77,6 +79,13 @@ def crop(image: np.ndarray, box: BoundingBox) -> np.ndarray:
     h, w = image.shape[:2]
     x0, y0 = max(0, box.x), max(0, box.y)
     return image[y0 : max(y0, min(h, box.y + box.h)), x0 : max(x0, min(w, box.x + box.w))].copy()
+
+
+def compose_pair(baseline: np.ndarray, target: np.ndarray, box: BoundingBox) -> np.ndarray:
+    """Place the baseline and target crops of ``box`` side by side, separated by a gray gap."""
+    left, right = crop(baseline, box), crop(target, box)
+    gap = np.full((left.shape[0], PAIR_GAP, 3), PAIR_GAP_COLOR, dtype=np.uint8)
+    return np.hstack([left, gap, right])
 
 
 def _union(a: BoundingBox, b: BoundingBox) -> BoundingBox:

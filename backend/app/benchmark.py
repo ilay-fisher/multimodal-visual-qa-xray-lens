@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import get_settings
-from app.cv_pipeline import VisualDiffPipeline, crop, decode_image, encode_png
+from app.cv_pipeline import VisualDiffPipeline, compose_pair, decode_image, encode_png
 from app.logging_config import configure_logging
 from app.vlm_client import VLMClient, estimate_image_tokens, get_vlm_client
 
@@ -71,7 +71,7 @@ async def compute_rows(
         target = decode_image((directory / f"{pid}_target.png").read_bytes())
         boxes = pipeline.run(baseline, target).boxes
         full_png = encode_png(target)
-        crops = [encode_png(crop(target, box)) for box in boxes]
+        crops = [encode_png(compose_pair(baseline, target, box)) for box in boxes]
         full_ms = await _timed_call(client, full_png, context)
         roi_ms = sum([await _timed_call(client, png, context) for png in crops])
         height, width = target.shape[:2]
@@ -82,7 +82,7 @@ async def compute_rows(
                 len(full_png),
                 sum(len(png) for png in crops),
                 estimate_image_tokens(width, height),
-                sum(estimate_image_tokens(b.w, b.h) for b in boxes),
+                sum(estimate_image_tokens(2 * b.w + 8, b.h) for b in boxes),
                 full_ms,
                 roi_ms,
             )
@@ -106,7 +106,7 @@ COLUMNS = [
 ]
 
 
-def format_table(rows: list[Row]) -> str:
+def format_table(rows: list[Row], simulated: bool = False) -> str:
     """Render rows plus a TOTAL line as an aligned text table."""
     sums = {
         f: sum(getattr(r, f) for r in rows) for f in Row.__dataclass_fields__ if f != "preset_id"
@@ -123,7 +123,8 @@ def format_table(rows: list[Row]) -> str:
         for line in lines
     ]
     rule = "  ".join("-" * w for w in widths)
-    return "\n".join([text[0], rule, *text[1:-1], rule, text[-1]])
+    note = ["* latency is simulated (demo streaming delay), not model speed"] if simulated else []
+    return "\n".join([text[0], rule, *text[1:-1], rule, text[-1], *note])
 
 
 def main() -> None:
@@ -136,7 +137,7 @@ def main() -> None:
     configure_logging("WARNING", settings.log_format)
     rows = asyncio.run(compute_rows(get_vlm_client(args.backend, settings), args.sensitivity))
     print(f"backend={args.backend} sensitivity={args.sensitivity}")  # noqa: T201
-    print(format_table(rows))  # noqa: T201
+    print(format_table(rows, simulated=args.backend == "demo"))  # noqa: T201
 
 
 if __name__ == "__main__":

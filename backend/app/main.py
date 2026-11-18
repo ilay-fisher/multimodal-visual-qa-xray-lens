@@ -6,10 +6,8 @@ import json
 import logging
 import time
 import uuid
-from collections import OrderedDict, deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime
 from typing import Annotated, Any
 
 import cv2
@@ -21,6 +19,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import get_settings
 from app.cv_pipeline import VisualDiffPipeline, decode_image, encode_png
+from app.guards import DailyBudget, RateLimiter, ResponseCache
 from app.logging_config import configure_logging, request_id_var
 from app.schemas import BoxOut, InspectResponse, PresetOut
 from app.vlm_client import VLMError, VLMOutputError, get_vlm_client, parse_report
@@ -32,62 +31,6 @@ VERSION = "0.1.0"
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 MAX_CONTEXT_CHARS = 200
 settings = get_settings()
-
-
-class RateLimiter:
-    """In-memory per-key sliding-window limiter."""
-
-    def __init__(self) -> None:
-        self._hits: dict[str, deque[float]] = {}
-
-    def allow(self, key: str, limit: int) -> bool:
-        """Record a hit for ``key``; False when ``limit`` hits already fit the window."""
-        now = time.monotonic()
-        hits = self._hits.setdefault(key, deque())
-        while hits and now - hits[0] >= 60:
-            hits.popleft()
-        if len(hits) >= limit:
-            return False
-        hits.append(now)
-        return True
-
-
-class DailyBudget:
-    """Counts paid requests per UTC day; the count resets at UTC midnight."""
-
-    def __init__(self) -> None:
-        self._day: date | None = None
-        self._count = 0
-
-    def take(self, cap: int) -> bool:
-        """Consume one request from today's budget; False when the cap is reached."""
-        today = datetime.now(UTC).date()
-        if today != self._day:
-            self._day, self._count = today, 0
-        if self._count >= cap:
-            return False
-        self._count += 1
-        return True
-
-
-class ResponseCache(OrderedDict[str, dict[str, Any]]):
-    """Small LRU cache of finished diagnoses."""
-
-    def __init__(self, size: int = 256) -> None:
-        super().__init__()
-        self.size = size
-
-    def lookup(self, key: str) -> dict[str, Any] | None:
-        """Return a cached result and mark it recently used."""
-        if key in self:
-            self.move_to_end(key)
-        return self.get(key)
-
-    def store(self, key: str, value: dict[str, Any]) -> None:
-        """Store a result, evicting the least recently used entry when full."""
-        self[key] = value
-        while len(self) > self.size:
-            self.popitem(last=False)
 
 
 cache = ResponseCache(256)
@@ -122,7 +65,12 @@ async def request_context(
     rid = request.headers.get("x-request-id") or uuid.uuid4().hex
     token = request_id_var.set(rid)
     started = time.perf_counter()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        ms = round((time.perf_counter() - started) * 1000, 1)
+        logger.error("%s %s 500 %.1fms", request.method, request.url.path, ms, exc_info=True)
+        raise
     ms = round((time.perf_counter() - started) * 1000, 1)
     extra = {"status": response.status_code, "elapsed_ms": ms}
     logger.info(
