@@ -43,13 +43,13 @@
     <div class="card"><h3>agent-cv <span class="tag wip">in progress</span></h3>
       <code>feat/cv-pipeline</code>
       <ul><li>app/cv_pipeline.py</li><li>scripts/generate_samples.py + samples/</li><li>tests/test_pipeline.py</li></ul></div>
-    <div class="card"><h3>agent-vlm <span class="tag wip">in progress</span></h3>
+    <div class="card"><h3>agent-vlm <span class="tag wip">changes requested</span></h3>
       <code>feat/vlm-client</code>
       <ul><li>app/schemas.py, app/config.py</li><li>app/vlm_client.py (demo/local/cloud)</li><li>tests/test_vlm.py, tests/test_schemas.py</li></ul></div>
     <div class="card"><h3>agent-frontend <span class="tag wip">in progress</span></h3>
       <code>feat/frontend</code>
       <ul><li>Vite + React + TS scaffold</li><li>XRaySlider, DiagnosisPanel, Toolbar</li><li>Vitest component tests, mock API</li></ul></div>
-    <div class="card"><h3>agent-infra <span class="tag wip">in progress</span></h3>
+    <div class="card"><h3>agent-infra <span class="tag done">merged</span></h3>
       <code>feat/infra</code>
       <ul><li>app/logging_config.py</li><li>Dockerfiles, docker-compose.yml</li><li>GitHub Actions CI, pyproject, .env.example, Makefile</li></ul></div>
   </div>
@@ -65,7 +65,8 @@
 
   <h2>PR log</h2>
   <table><tr><th>PR</th><th>Branch</th><th>Status</th><th>Review notes</th></tr>
-    <tr><td colspan="4" style="color:var(--muted)">No PRs yet.</td></tr>
+    <tr><td>#1</td><td>feat/infra</td><td class="done">merged</td><td>TDD order ok. Docker job red until samples/ land (expected).</td></tr>
+    <tr><td>#2</td><td>feat/vlm-client</td><td class="wip">changes requested</td><td>Rebase on pyproject, public docstrings, no tracebacks on SDK errors.</td></tr>
   </table>
 </main>
 </body>
