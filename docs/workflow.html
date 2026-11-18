@@ -84,6 +84,16 @@
       <ul><li>Anthropic console: dedicated workspace with its own spend limit</li><li>Key from that workspace in backend/.env</li></ul></div>
   </div>
 
+  <h2>Wave 5 - redesign</h2>
+  <div class="wave">
+    <div class="card"><h3>agent-design-tokens <span class="tag done">merged</span></h3>
+      <code>feat/design-tokens-tray</code>
+      <ul><li>PR 16: tokens, springs, material, tray, one accent, simulated tag</li><li>38 tests, 717 frontend lines</li></ul></div>
+    <div class="card"><h3>agent-lens <span class="tag">in review</span></h3>
+      <code>feat/lens-instrument</code>
+      <ul><li>PR 2: native range, knob on rail with inertia, scan edge, machine-vision colormap, hold for baseline, first-run sweep</li><li>Evidence: docs/redesign/pr2/</li></ul></div>
+  </div>
+
   <h2>PR log</h2>
   <table><tr><th>PR</th><th>Branch</th><th>Status</th><th>Review notes</th></tr>
     <tr><td>#1</td><td>feat/infra</td><td class="done">merged</td><td>TDD order ok. Docker job red until samples/ land (expected).</td></tr>
@@ -100,6 +110,9 @@
     <tr><td>#12</td><td>docs/board-wave3</td><td class="done">merged</td><td>Build board update.</td></tr>
     <tr><td>#13</td><td>feat/roi-upscale</td><td class="done">merged</td><td>Small crops upscaled up to 4x, gap unscaled. 603/610 frontend lines. Manager live check in UI: Haiku solder_bridge High 82%.</td></tr>
     <tr><td>#14</td><td>docs/final-readme</td><td class="done">merged</td><td>Final README. Manager fixed test command chaining and re-ran all 4 regions on Haiku with the exact upscale rule: 4/4.</td></tr>
+    <tr><td>#15</td><td>docs/redesign-proposal</td><td class="done">merged</td><td>Redesign proposal and before frames; owner decisions recorded.</td></tr>
+    <tr><td>#16</td><td>feat/design-tokens-tray</td><td class="done">merged</td><td>2 review rounds: one accent, simulated tag, mobile tray row. 38 tests, 717 lines.</td></tr>
+    <tr><td>PR 2</td><td>feat/lens-instrument</td><td>in review</td><td>Lens as instrument + first-run sweep. 76 tests, 1,021 frontend lines.</td></tr>
   </table>
 </main>
 </body>
