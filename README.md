@@ -6,17 +6,25 @@ milliseconds; a VLM is then asked *what* changed, but only on the cropped Region
 Interest (ROIs). Unchanged background pixels are never sent to the model, which cuts
 payload size, token cost and inference latency.
 
-A React "X-Ray Lens" lets you drag a split-screen slider over the target image to reveal
-the CV diff heatmap, click any flagged region, and watch the structured VLM diagnosis
-stream in live over Server-Sent Events.
+A React "X-Ray Lens" shows the result. A split lens on a knob and rail slides over the target
+image to reveal the CV diff as a machine-vision scan, and you can hold a button to peek at the
+baseline. Flagged regions lock on with corner brackets. Click one and its crop flies into a
+readout that fills in field by field as the structured diagnosis streams over Server-Sent
+Events. A full frame vs regions comparison shows the token and latency savings, each tagged
+live, measured or simulated.
+
+![The X-Ray Lens UI in demo mode](docs/images/xray-lens-ui.png)
+
+*The X-Ray Lens UI in demo mode (free, simulated diagnosis; latency bars are the measured Haiku 5.5 benchmark).*
 
 ![PCB solder bridge diagnosed by Claude Haiku 5.5](docs/images/haiku-u2.png)
 
-*PCB solder bridge diagnosed by Claude Haiku 5.5 from a 242x75 px composite.*
+*Live-model example: PCB solder bridge diagnosed by Claude Haiku 5.5 from a 242x75 px composite (a real run, not demo mode).*
 
 Project process: built by a manager agent with worker agents, TDD, one PR per feature. See
 [`docs/workflow.html`](docs/workflow.html) (build board) and [`docs/CONTRACTS.md`](docs/CONTRACTS.md)
-(interface contracts).
+(interface contracts). The UI redesign is described in
+[`docs/redesign/PROPOSAL.md`](docs/redesign/PROPOSAL.md), with evidence per step under `docs/redesign/`.
 
 ## Architecture: the two-stage funnel
 
