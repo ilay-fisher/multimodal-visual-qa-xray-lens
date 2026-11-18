@@ -118,6 +118,8 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
           const text = key === "confidence" ? (conf === undefined ? live : `${conf}%`) : key === "severity" ? "" : (fields[key] as string | undefined) ?? live;
           const state = key in fields ? "done" : live ? "live" : "empty";
           const active = key === activeKey;
+          // The row's trailing mark: paint caret on the active row, a quiet dash on an empty one.
+          const tail = active && !reduced ? <span className="caret" aria-hidden="true" /> : state === "empty" ? <span className="dash">{DASH}</span> : null;
           return (
             <div key={key} className="row" data-row={key} data-state={state} data-active={active || undefined}>
               <dt>{label}</dt>
@@ -130,9 +132,7 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
                     <i style={{ width: `${conf ?? 0}%` }} />
                   </div>
                 )}
-                {text && (key === "confidence" ? <b>{text}</b> : text)}
-                {state === "empty" && !(active && !reduced) && <span className="dash">{DASH}</span>}
-                {active && !reduced && <span className="caret" aria-hidden="true" />}
+                {key === "confidence" ? <b>{text}{tail}</b> : <>{text}{tail}</>}
               </dd>
             </div>
           );
