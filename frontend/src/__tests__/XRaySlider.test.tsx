@@ -273,3 +273,78 @@ describe("XRaySlider: reduced motion", () => {
     expect(lens(stage)).toBe(88);
   });
 });
+
+describe("XRaySlider: lock-on", () => {
+  const regions = () => screen.getAllByRole("button", { name: /^Region \d/ });
+
+  it("keeps real buttons with the exact aria-labels and a data-roi hook", () => {
+    setup(1);
+    expect(screen.getByRole("button", { name: "Region 1, 120 by 90 pixels" })).toHaveAttribute("data-roi", "0");
+    const second = screen.getByRole("button", { name: "Region 2, 60 by 40 pixels" });
+    expect(second.tagName).toBe("BUTTON");
+    expect(second).toHaveAttribute("data-roi", "1");
+    expect(second).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("draws four decorative brackets and a typed label per region, no numbered badge", () => {
+    setup();
+    for (const r of regions()) {
+      expect(r.querySelectorAll(".brk i")).toHaveLength(4);
+      expect(r.querySelector(".brk")).toHaveAttribute("aria-hidden", "true");
+    }
+    expect(screen.getByText("R1 · 120×90")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("R2 · 60×40")).toBeInTheDocument();
+    expect(regions()[0].textContent).toBe("R1 · 120×90");
+  });
+
+  it("waits while the sweep has not settled, then locks on 90 ms apart", () => {
+    sessionStorage.clear(); // sweep will run
+    setup();
+    expect(regions()[0]).toHaveAttribute("data-lock", "wait");
+    act(() => visible?.());
+    advance(100);
+    expect(regions()[0]).toHaveAttribute("data-lock", "wait"); // sweep still running
+    advance(2800);
+    expect(regions()[0]).toHaveAttribute("data-lock", "lock");
+    expect(regions().map((r) => r.style.getPropertyValue("--d"))).toEqual(["0ms", "90ms"]);
+  });
+
+  it("never leaves regions hidden: no IntersectionObserver, or one that never fires", () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    sessionStorage.clear();
+    const first = setup();
+    advance(2800); // sweep runs on mount without an observer
+    expect(regions()[0]).toHaveAttribute("data-lock", "lock");
+    first.unmount();
+    mockObserver(); // exists, but the stage never reports as visible
+    setup();
+    expect(regions()[0]).toHaveAttribute("data-lock", "wait");
+    advance(1300);
+    expect(regions()[0]).toHaveAttribute("data-lock", "lock");
+  });
+
+  it("locks on right away when the sweep was already seen", () => {
+    setup();
+    act(() => visible?.());
+    expect(regions()[1]).toHaveAttribute("data-lock", "lock");
+  });
+
+  it("shows the settled state immediately under reduced motion", () => {
+    mockReducedMotion(true);
+    setup();
+    for (const r of regions()) expect(r).toHaveAttribute("data-lock", "rest");
+    expect(screen.getByText("R1 · 120×90")).toBeInTheDocument();
+  });
+
+  it("re-locks on new regions but not on an identical re-render", () => {
+    const { rerender } = setup();
+    act(() => visible?.());
+    const first = regions()[0];
+    const props = { selectedId: null, onSelectBox: vi.fn() };
+    rerender(<XRaySlider data={{ ...inspectFixture }} {...props} />);
+    expect(regions()[0]).toBe(first);
+    const moved = { ...inspectFixture, boxes: [{ ...inspectFixture.boxes[0], w: 130 }, inspectFixture.boxes[1]] };
+    rerender(<XRaySlider data={moved} {...props} />);
+    expect(regions()[0]).not.toBe(first);
+  });
+});

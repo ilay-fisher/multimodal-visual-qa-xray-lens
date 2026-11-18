@@ -4,6 +4,7 @@ import { logDebug } from "./log";
 import { renderScan } from "./scan";
 import type { SpringState } from "./spring";
 import { sweepAt } from "./sweep";
+import type { BoxOut } from "../types";
 
 const SWEEP_FLAG = "xray.sweep";
 const clampPct = (v: number) => Math.min(100, Math.max(0, v));
@@ -142,11 +143,11 @@ export function useFirstRunSweep(host: RefObject<HTMLElement>, reduced: boolean,
  * Machine-vision image for the scan side (see lib/scan.ts). `null` while it renders;
  * falls back to the raw overlay if canvas is unavailable.
  */
-export function useScanSrc(target: string, overlay: string): string | null {
+export function useScanSrc(target: string, overlay: string, boxes: readonly BoxOut[]): string | null {
   const [done, setDone] = useState<{ key: string; src: string } | null>(null);
   useEffect(() => {
     let live = true;
-    renderScan(target, overlay)
+    renderScan(target, overlay, boxes)
       .then((src) => live && setDone({ key: overlay, src }))
       .catch((err) => {
         logDebug("scan colormap unavailable, using raw overlay", err);
@@ -155,6 +156,6 @@ export function useScanSrc(target: string, overlay: string): string | null {
     return () => {
       live = false;
     };
-  }, [target, overlay]);
+  }, [target, overlay, boxes]);
   return done?.key === overlay ? done.src : null;
 }
