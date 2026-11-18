@@ -61,6 +61,16 @@ export function springCss(cfg: SpringConfig, points = 32): { easing: string; dur
   return { easing: `linear(${samples.join(", ")})`, durationMs: Math.round(times[last] * 1000) };
 }
 
+/**
+ * Like `springCss` but monotone: it rises to the target and stays there. The overshoot is clamped and
+ * the dip after it is flattened, for things that must never pass (or fall back from) their true value.
+ */
+export function springCssClamped(cfg: SpringConfig): { easing: string; durationMs: number } {
+  const { easing, durationMs } = springCss(cfg);
+  let top = 0;
+  return { easing: easing.replace(/-?\d*\.?\d+/g, (n) => String((top = Math.max(top, Math.min(Number(n), 1))))), durationMs };
+}
+
 /** Publishes `--spring-soft/-dur` and `--spring-snappy/-dur` on the element (the root at startup). */
 export function applySpringTokens(el: HTMLElement): void {
   for (const [name, cfg] of [["soft", SPRING_SOFT], ["snappy", SPRING_SNAPPY]] as const) {
