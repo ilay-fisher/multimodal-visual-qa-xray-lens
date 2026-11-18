@@ -4,6 +4,7 @@ import { partialReport } from "../lib/partialReport";
 import { SPRING_SOFT, springCss } from "../lib/spring";
 import { useReducedMotion } from "../lib/useLens";
 import type { DefectReport, ErrorCode, ResultData } from "../types";
+import { Savings, type Telemetry } from "./Savings";
 
 export interface Diagnosis {
   status: "idle" | "streaming" | "done" | "error";
@@ -13,12 +14,6 @@ export interface Diagnosis {
   /** The exact composite image (baseline | target) sent to the VLM, and the clicked region's rect it flies from. */
   sent?: { blob: Blob; width: number; height: number; from?: DOMRect };
   error?: { message: string; code: ErrorCode | "network" };
-}
-
-export interface Telemetry {
-  cvTimeMs: number;
-  pixelsFilteredPct: number;
-  tokenSavingsPct: number;
 }
 
 const ROWS: [keyof DefectReport, string][] = [
@@ -51,7 +46,7 @@ function useRevealed(len: number, paced: boolean): number {
 }
 
 /**
- * Instrument readout plus the four-cell telemetry bar. Rows fill from `partialReport(raw)` while
+ * Instrument readout plus the "Full frame vs regions" savings instrument. Rows fill from `partialReport(raw)` while
  * streaming, then from `result.report` (the truth). The sent composite flies in from the clicked
  * region (FLIP, SPRING_SOFT) once its pixels are loaded. Under reduced motion there is no flight,
  * caret or half-typed text: rows show finished values. The live region is polite and busy while
@@ -61,6 +56,8 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
   const { status, result, sent } = diagnosis;
   const reduced = useReducedMotion();
   const [sentUrl, setSentUrl] = useState<string | null>(null);
+  /** True while the specimen flight runs: the savings bars wait for it (one loud motion at a time). */
+  const [flying, setFlying] = useState(false);
   useEffect(() => {
     if (!sent) return setSentUrl(null);
     const url = URL.createObjectURL(sent.blob);
@@ -76,7 +73,10 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
     // Spring easing with the overshoot clamped, so the layer lands inside the well instead of past its edge.
     const { easing, durationMs } = springCss(SPRING_SOFT);
     const landing = easing.replace(/-?\d*\.?\d+/g, (n) => String(Math.min(Number(n), 1)));
-    el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }], { duration: durationMs, easing: landing });
+    const flight = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }], { duration: durationMs, easing: landing });
+    if (!flight) return;
+    setFlying(true);
+    flight.onfinish = flight.oncancel = () => setFlying(false);
   };
 
   const revealed = useRevealed(diagnosis.raw.length, !reduced && simulated);
@@ -87,12 +87,6 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
   const fields: Partial<DefectReport> = report ?? partial.fields;
   const activeKey = busy && !report ? (partial.active?.key ?? ROWS.find(([k]) => !(k in fields))?.[0]) : undefined;
   const conf = fields.confidence === undefined ? undefined : Math.round(fields.confidence * 100);
-  const cells: [string, string, boolean?][] = [
-    ["CV preprocess time", `${telemetry.cvTimeMs.toFixed(1)} ms`],
-    ["Pixels filtered out", `${telemetry.pixelsFilteredPct.toFixed(1)}%`],
-    ["Estimated token savings", `${telemetry.tokenSavingsPct.toFixed(1)}%`],
-    ["VLM inference time", result ? `${Math.round(result.vlm_time_ms)} ms` : "--", simulated],
-  ];
 
   return (
     <section className="panel diagnosis" aria-live="polite" aria-busy={busy}>
@@ -156,14 +150,7 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
         </details>
       )}
 
-      <dl className="telemetry">
-        {cells.map(([label, value, sim]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}{sim && <i className="tag">simulated</i>}</dd>
-          </div>
-        ))}
-      </dl>
+      <Savings telemetry={telemetry} vlmMs={result?.vlm_time_ms} simulated={simulated} hold={flying} />
     </section>
   );
 }
