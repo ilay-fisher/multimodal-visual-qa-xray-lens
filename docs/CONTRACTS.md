@@ -19,7 +19,7 @@ the manager decides.
 - No `print` in app code (CLI scripts may print their final table/summary).
 - Lint clean: `ruff check` + `ruff format --check` + `mypy app` (backend),
   `npm run lint` + `npm run typecheck` (frontend).
-- Line budget (core app code only, tests/infra/config excluded): **<= 1,600 total**.
+- Line budget (core app code only, tests/infra/config excluded): **<= 1,600 total for backend core only** (the frontend has its own cap in the table below).
 
 | File | Budget |
 |---|---|
@@ -28,7 +28,7 @@ the manager decides.
 | backend/app/schemas.py + config.py + vlm_client.py | 300 |
 | backend/app/main.py | 200 |
 | backend/app/benchmark.py | 110 |
-| frontend/src (all .ts/.tsx, excluding tests) | 610 |
+| frontend/src (non-test .ts/.tsx, excluding mocks and tests, non-blank lines) | 1,500 (owner decision 2026-11-18) |
 
 ## 1. Dependencies (already pinned by manager)
 

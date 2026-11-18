@@ -91,18 +91,7 @@ export default function App() {
     <div className="app">
       <header className="top">
         <h1><span className="mark" aria-hidden="true" />X-Ray Lens</h1>
-        <p>Find what changed with computer vision, then ask a vision model only about those pixels.</p>
       </header>
-      <Toolbar
-        presets={presets}
-        presetId={presetId}
-        sensitivity={sensitivity}
-        backend={backend}
-        onPresetChange={(id) => { setUpload(null); setPresetId(id); }}
-        onUpload={(baseline, target) => { setPresetId(null); setUpload({ baseline, target }); }}
-        onSensitivityChange={setSensitivity}
-        onBackendChange={setBackend}
-      />
       <main className="workspace">
         <div className="view" aria-busy={loading}>
           {data ? (
@@ -113,6 +102,17 @@ export default function App() {
           {loading && data && <span className="scan">Re-scanning</span>}
           {failure && data && <p className="error" role="alert">{failure}</p>}
           {data && data.boxes.length === 0 && <p className="hint">No differences found. Raise the sensitivity to catch subtler changes.</p>}
+          <p className="caption">Find what changed with computer vision, then ask a vision model only about those pixels.</p>
+          <Toolbar
+            presets={presets}
+            presetId={presetId}
+            sensitivity={sensitivity}
+            backend={backend}
+            onPresetChange={(id) => { setUpload(null); setPresetId(id); }}
+            onUpload={(baseline, target) => { setPresetId(null); setUpload({ baseline, target }); }}
+            onSensitivityChange={setSensitivity}
+            onBackendChange={setBackend}
+          />
         </div>
         <DiagnosisPanel
           diagnosis={diagnosis}
