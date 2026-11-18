@@ -7,7 +7,7 @@ import argparse
 import asyncio
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from pathlib import Path
 
 from app.config import get_settings
@@ -35,17 +35,14 @@ class Row:
 
     @property
     def bytes_savings_pct(self) -> float:
-        """Payload bytes saved by cropping, in percent."""
         return self._saved(self.full_bytes, self.roi_bytes)
 
     @property
     def tokens_savings_pct(self) -> float:
-        """Estimated image tokens saved by cropping, in percent."""
         return self._saved(self.full_tokens, self.roi_tokens)
 
     @property
     def latency_savings_pct(self) -> float:
-        """Measured VLM latency saved by cropping (negative when slower), in percent."""
         return self._saved(self.full_ms, self.roi_ms)
 
 
@@ -62,27 +59,24 @@ async def compute_rows(
 ) -> list[Row]:
     """Measure every preset; pure of side effects apart from the VLM calls."""
     directory = samples_dir or get_settings().samples_dir
-    presets = json.loads((directory / "presets.json").read_text(encoding="utf-8"))
     pipeline = VisualDiffPipeline(sensitivity=sensitivity)
     rows = []
-    for preset in presets:
+    for preset in json.loads((directory / "presets.json").read_text(encoding="utf-8")):
         pid, context = preset["id"], preset["domain_context"]
         baseline = decode_image((directory / f"{pid}_baseline.png").read_bytes())
         target = decode_image((directory / f"{pid}_target.png").read_bytes())
-        boxes = pipeline.run(baseline, target).boxes
-        full_png = encode_png(target)
-        crops = [encode_png(compose_pair(baseline, target, box)) for box in boxes]
+        pairs = [compose_pair(baseline, target, b) for b in pipeline.run(baseline, target).boxes]
+        full_png, crops = encode_png(target), [encode_png(p) for p in pairs]
         full_ms = await _timed_call(client, full_png, context)
         roi_ms = sum([await _timed_call(client, png, context) for png in crops])
-        height, width = target.shape[:2]
         rows.append(
             Row(
                 pid,
-                len(boxes),
+                len(pairs),
                 len(full_png),
                 sum(len(png) for png in crops),
-                estimate_image_tokens(width, height),
-                sum(estimate_image_tokens(2 * b.w + 8, b.h) for b in boxes),
+                estimate_image_tokens(target.shape[1], target.shape[0]),
+                sum(estimate_image_tokens(p.shape[1], p.shape[0]) for p in pairs),
                 full_ms,
                 roi_ms,
             )
@@ -108,13 +102,10 @@ COLUMNS = [
 
 def format_table(rows: list[Row], simulated: bool = False) -> str:
     """Render rows plus a TOTAL line as an aligned text table."""
-    sums = {
-        f: sum(getattr(r, f) for r in rows) for f in Row.__dataclass_fields__ if f != "preset_id"
-    }
+    total = Row("TOTAL", *map(sum, zip(*(astuple(r)[1:] for r in rows), strict=True)))
     lines = [[h for h, _, _ in COLUMNS]]
-    for r in [*rows, Row("TOTAL", **sums)]:
-        lines.append([fmt.format(getattr(r, attr)) for _, attr, fmt in COLUMNS])
-    widths = [max(len(line[k]) for line in lines) for k in range(len(COLUMNS))]
+    lines += [[f.format(getattr(r, a)) for _, a, f in COLUMNS] for r in [*rows, total]]
+    widths = [max(map(len, column)) for column in zip(*lines, strict=True)]
     text = [
         "  ".join(
             c.ljust(w) if k == 0 else c.rjust(w)
@@ -136,8 +127,8 @@ def main() -> None:
     settings = get_settings()
     configure_logging("WARNING", settings.log_format)
     rows = asyncio.run(compute_rows(get_vlm_client(args.backend, settings), args.sensitivity))
-    print(f"backend={args.backend} sensitivity={args.sensitivity}")  # noqa: T201
-    print(format_table(rows, simulated=args.backend == "demo"))  # noqa: T201
+    print(f"backend={args.backend} sensitivity={args.sensitivity}")
+    print(format_table(rows, simulated=args.backend == "demo"))
 
 
 if __name__ == "__main__":

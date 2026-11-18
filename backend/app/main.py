@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 VERSION = "0.1.0"
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 MAX_CONTEXT_CHARS = 200
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 settings = get_settings()
 
 
@@ -68,8 +69,7 @@ async def request_context(
     try:
         response = await call_next(request)
     except Exception:
-        ms = round((time.perf_counter() - started) * 1000, 1)
-        logger.error("%s %s 500 %.1fms", request.method, request.url.path, ms, exc_info=True)
+        logger.error("%s %s 500", request.method, request.url.path, exc_info=True)
         raise
     ms = round((time.perf_counter() - started) * 1000, 1)
     extra = {"status": response.status_code, "elapsed_ms": ms}
@@ -107,10 +107,6 @@ async def _read_upload(upload: UploadFile) -> bytes:
     return data
 
 
-def _b64_png(image: Any) -> str:
-    return base64.b64encode(encode_png(image)).decode()
-
-
 def _inspect(preset_id: str | None, base: bytes, tgt: bytes, sens: float, area: int) -> Any:
     """CPU-bound part of /inspect (runs in a worker thread); returns an InspectResponse."""
     baseline, target = decode_image(base), decode_image(tgt)
@@ -127,8 +123,8 @@ def _inspect(preset_id: str | None, base: bytes, tgt: bytes, sens: float, area: 
         preset_id=preset_id,
         image_width=res.image_width,
         image_height=res.image_height,
-        baseline_png_b64=_b64_png(baseline),
-        target_png_b64=_b64_png(target),
+        baseline_png_b64=base64.b64encode(encode_png(baseline)).decode(),
+        target_png_b64=base64.b64encode(encode_png(target)).decode(),
         overlay_png_b64=base64.b64encode(res.overlay_png).decode(),
         boxes=boxes,
         pixels_filtered_pct=res.pixels_filtered_pct,
@@ -180,16 +176,15 @@ async def _analysis_events(
         yield _sse("status", {"stage": "inference", "backend": hit["backend"]})
         yield _sse("result", {**hit, "roi_tokens": tokens, "cached": True})
         return
-    if mode == "cloud":
-        denied = None
-        if not limiter.allow(ip, settings.rate_limit_per_minute):
-            denied = ("rate_limited", "Too many requests, slow down.")
-        elif not budget.take(settings.cloud_daily_request_cap):
-            denied = ("budget_exceeded", "Daily cloud budget used up. Try demo mode.")
-        if denied:
-            logger.warning("cloud analyze denied code=%s ip=%s", denied[0], ip)
-            yield _sse("error", {"message": denied[1], "code": denied[0]})
-            return
+    denied = None
+    if mode == "cloud" and not limiter.allow(ip, settings.rate_limit_per_minute):
+        denied = ("rate_limited", "Too many requests, slow down.")
+    elif mode == "cloud" and not budget.take(settings.cloud_daily_request_cap):
+        denied = ("budget_exceeded", "Daily cloud budget used up. Try demo mode.")
+    if denied:
+        logger.warning("cloud analyze denied code=%s ip=%s", denied[0], ip)
+        yield _sse("error", {"message": denied[1], "code": denied[0]})
+        return
     code, message = "vlm_error", "The VLM backend is unavailable."
     try:
         client = get_vlm_client(mode, settings)
@@ -233,8 +228,4 @@ async def analyze_roi(
         raise HTTPException(400, "roi_image is not a decodable image") from exc
     ip = request.client.host if request.client else "unknown"
     events = _analysis_events(image, domain_context, mode, ip, est_tokens(width, height))
-    return StreamingResponse(
-        events,
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return StreamingResponse(events, media_type="text/event-stream", headers=SSE_HEADERS)

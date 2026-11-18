@@ -95,12 +95,9 @@ def _union(a: BoundingBox, b: BoundingBox) -> BoundingBox:
 
 def _touches(a: BoundingBox, b: BoundingBox, gap: int) -> bool:
     """True if the boxes overlap or are separated by at most ``gap`` pixels."""
-    return (
-        a.x <= b.x + b.w + gap
-        and b.x <= a.x + a.w + gap
-        and a.y <= b.y + b.h + gap
-        and b.y <= a.y + a.h + gap
-    )
+    dx = max(a.x, b.x) - min(a.x + a.w, b.x + b.w)
+    dy = max(a.y, b.y) - min(a.y + a.h, b.y + b.h)
+    return dx <= gap and dy <= gap
 
 
 def merge_boxes(boxes: list[BoundingBox], gap: int = 0) -> list[BoundingBox]:

@@ -18,10 +18,10 @@ class RateLimiter:
         hits = self._hits.setdefault(key, deque())
         while hits and now - hits[0] >= 60:
             hits.popleft()
-        if len(hits) >= limit:
-            return False
-        hits.append(now)
-        return True
+        allowed = len(hits) < limit
+        if allowed:
+            hits.append(now)
+        return allowed
 
 
 class DailyBudget:
@@ -36,10 +36,9 @@ class DailyBudget:
         today = datetime.now(UTC).date()
         if today != self._day:
             self._day, self._count = today, 0
-        if self._count >= cap:
-            return False
-        self._count += 1
-        return True
+        allowed = self._count < cap
+        self._count += allowed
+        return allowed
 
 
 class ResponseCache(OrderedDict[str, dict[str, Any]]):

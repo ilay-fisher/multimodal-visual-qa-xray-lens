@@ -18,6 +18,7 @@ from openai import AsyncOpenAI
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.cv_pipeline import PAIR_GAP, PAIR_GAP_COLOR
 from app.schemas import DefectReport, Severity
 
 logger = logging.getLogger(__name__)
@@ -42,32 +43,24 @@ class VLMClient(Protocol):
 # domain -> ["category|allowed severities|evidence|action"]; the demo picks one by hash.
 RULES = {
     "pcb": [
-        "missing_component|high critical|"
-        "A component present in the baseline is gone; only bare pads remain in the target.|"
+        "missing_component|high critical|Part missing on the right; only bare pads remain.|"
         "Reflow, place part.",
-        "solder_bridge|medium high|"
-        "A bright metallic blob now joins two adjacent pads that were separate in the baseline.|"
+        "solder_bridge|medium high|A bright metal blob now bridges two adjacent pads.|"
         "Remove bridge, re-inspect.",
     ],
     "aerial": [
-        "irrigation_stress|medium high|"
-        "The vegetation turned yellow-brown compared with the healthy green baseline.|"
+        "irrigation_stress|medium high|Vegetation turned yellow-brown versus the baseline.|"
         "Check irrigation lines.",
-        "pest_damage|low medium|"
-        "The canopy looks thinner and speckled compared with the baseline.|"
+        "pest_damage|low medium|The canopy is thinner and speckled versus the baseline.|"
         "Scout and treat locally.",
     ],
     "ui": [
-        "clipped_element|medium high|"
-        "The element is cut off at its container edge in the target; the baseline shows it whole.|"
+        "clipped_element|medium high|Element is cut off in the target but whole in the baseline.|"
         "Fix overflow or sizing.",
-        "misalignment|low medium|"
-        "The element sits off its neighbors' grid compared with the baseline.|"
+        "misalignment|low medium|The element sits off its neighbors' grid versus the baseline.|"
         "Restore the alignment.",
     ],
-    "generic": [
-        "visual_anomaly|low medium high|The region differs from the baseline.|Review manually."
-    ],
+    "generic": ["visual_anomaly|low medium high|The region differs from the baseline.|Review."],
 }
 
 
@@ -124,21 +117,16 @@ class DemoVLMClient:
     @staticmethod
     def _split(img: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
         """Return (baseline, target) halves of a composite, or None when there is no gap."""
-        width = img.shape[1] - 8
-        if width < 2 or width % 2:
+        half, odd = divmod(img.shape[1] - PAIR_GAP, 2)
+        gap = img[:, half : half + PAIR_GAP].astype(int)
+        if half < 1 or odd or np.abs(gap - PAIR_GAP_COLOR).max() > 2:
             return None
-        gap = img[:, width // 2 : width // 2 + 8].astype(int)
-        return (
-            (img[:, : width // 2], img[:, width // 2 + 8 :])
-            if int(np.abs(gap - 128).max()) <= 2
-            else None
-        )
+        return img[:, :half], img[:, half + PAIR_GAP :]
 
     @staticmethod
     def _stats(img: np.ndarray) -> dict[str, float]:
         """Cheap pixel fractions: dark body, bright metal, yellow/brown, foreground."""
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
-        hue, sat, val = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+        hue, sat, val = np.moveaxis(cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float), 2, 0)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(float)
         return {
             "dark": float((val < 70).mean()),
@@ -150,16 +138,13 @@ class DemoVLMClient:
     def _classify(self, key: str, pair: tuple[np.ndarray, np.ndarray]) -> str | None:
         """Pick a category by comparing baseline and target halves; None for unknown domains."""
         a, b = self._stats(pair[0]), self._stats(pair[1])
+        d = {k: b[k] - a[k] for k in a}
         if key == "pcb":
-            return (
-                "solder_bridge"
-                if b["metal"] - a["metal"] > a["dark"] - b["dark"]
-                else "missing_component"
-            )
+            return "solder_bridge" if d["metal"] > -d["dark"] else "missing_component"
         if key == "aerial":
-            return "irrigation_stress" if b["yellow"] - a["yellow"] > 0.2 else "pest_damage"
+            return "irrigation_stress" if d["yellow"] > 0.2 else "pest_damage"
         if key == "ui":
-            return "clipped_element" if a["fg"] - b["fg"] > 0.1 else "misalignment"
+            return "clipped_element" if d["fg"] < -0.1 else "misalignment"
         return None
 
     def _report(self, image_png: bytes, domain_context: str) -> DefectReport:
@@ -169,9 +154,9 @@ class DemoVLMClient:
         pair = self._split(img) if img is not None else None
         edge = float((cv2.Canny(img, 100, 200) > 0).mean()) if img is not None else 0.0
         rules = RULES.get(key, RULES["generic"])
-        chosen = self._classify(key, pair) if pair else None
-        picked = [r for r in rules if r.startswith(f"{chosen}|")] if chosen else []
-        category, sevs, evidence, action = (picked or [rules[seed % len(rules)]])[0].split("|")
+        chosen = f"{self._classify(key, pair) if pair else None}|"
+        rule = next((r for r in rules if r.startswith(chosen)), rules[seed % len(rules)])
+        category, sevs, evidence, action = rule.split("|")
         severity = sevs.split()[(seed >> 16) % len(sevs.split())]
         conf = 0.55 + 0.42 * (0.6 * min(edge * 4, 1.0) + 0.4 * ((seed >> 8) % 100) / 100)
         return DefectReport(
