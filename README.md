@@ -55,6 +55,12 @@ flowchart LR
 | `local` | Free, runs on your machine | oMLX (Apple Silicon) or Ollama with a small vision model, e.g. Qwen2.5-VL |
 | `cloud` | Owner pays, never the visitor | Server-side key, guarded by per-IP rate limit, daily request cap and a response cache |
 
+## Abuse protection
+
+- nginx edge limits per client IP (`frontend/nginx.conf`): 10 req/min (burst 5) on `/api/inspect` and `/api/analyze-roi`, 60 req/min (burst 20) on the rest of `/api/`, 10 concurrent connections; excess gets HTTP 429.
+- Backend, cloud mode only: per-IP rate limit, a global daily request cap and a response cache.
+- For public deploys, set a monthly spend limit in the Anthropic console and put Cloudflare (or another CDN/WAF) in front; configure nginx `real_ip_header` so limits apply to the real client IP.
+
 ## Quick start
 
 Full setup instructions (backend, frontend, Docker) are finalized when the build completes.
