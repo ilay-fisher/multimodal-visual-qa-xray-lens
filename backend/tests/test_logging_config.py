@@ -9,7 +9,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from app.logging_config import configure_logging, request_id_var
+from app.logging_config import ConsoleFormatter, JsonFormatter, configure_logging, request_id_var
 
 REQUIRED_KEYS = {"ts", "level", "logger", "msg"}
 
@@ -24,15 +24,23 @@ def _restore_root_logger() -> Iterator[None]:
     request_id_var.set(None)
 
 
+def _managed_handlers() -> list[logging.StreamHandler[object]]:
+    """Handlers installed by configure_logging (pytest adds its own capture handlers)."""
+    return [
+        h
+        for h in logging.getLogger().handlers
+        if isinstance(h, logging.StreamHandler)
+        and isinstance(h.formatter, JsonFormatter | ConsoleFormatter)
+    ]
+
+
 def _capture(fmt: str = "json", level: str = "INFO") -> io.StringIO:
     """Configure logging and redirect the managed handler to an in-memory stream."""
     configure_logging(level=level, fmt=fmt)
     stream = io.StringIO()
-    root = logging.getLogger()
-    assert len(root.handlers) == 1
-    handler = root.handlers[0]
-    assert isinstance(handler, logging.StreamHandler)
-    handler.setStream(stream)
+    handlers = _managed_handlers()
+    assert len(handlers) == 1
+    handlers[0].setStream(stream)
     return stream
 
 
@@ -48,7 +56,7 @@ def test_json_output_has_required_keys() -> None:
     stream = _capture()
     logging.getLogger("app.test").info("hello %s", "world")
     record = _last_json(stream)
-    assert REQUIRED_KEYS <= set(record)
+    assert set(record) >= REQUIRED_KEYS
     assert record["msg"] == "hello world"
     assert record["level"] == "INFO"
     assert record["logger"] == "app.test"
@@ -95,7 +103,7 @@ def test_exception_text_included() -> None:
 def test_idempotent_single_handler() -> None:
     configure_logging()
     configure_logging(level="DEBUG", fmt="console")
-    assert len(logging.getLogger().handlers) == 1
+    assert len(_managed_handlers()) == 1
 
 
 def test_level_is_applied() -> None:
