@@ -18,7 +18,7 @@ export interface Telemetry {
 }
 
 /** Streaming diagnosis card plus the four-cell telemetry bar. */
-export function DiagnosisPanel({ diagnosis, telemetry }: { diagnosis: Diagnosis; telemetry: Telemetry }) {
+export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { diagnosis: Diagnosis; telemetry: Telemetry; simulated?: boolean }) {
   const { status, result, sent } = diagnosis;
   const [sentUrl, setSentUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -28,11 +28,11 @@ export function DiagnosisPanel({ diagnosis, telemetry }: { diagnosis: Diagnosis;
     return () => URL.revokeObjectURL(url);
   }, [sent]);
   const report = result?.report;
-  const cells: [string, string][] = [
+  const cells: [string, string, boolean?][] = [
     ["CV preprocess time", `${telemetry.cvTimeMs.toFixed(1)} ms`],
     ["Pixels filtered out", `${telemetry.pixelsFilteredPct.toFixed(1)}%`],
     ["Estimated token savings", `${telemetry.tokenSavingsPct.toFixed(1)}%`],
-    ["VLM inference time", result ? `${Math.round(result.vlm_time_ms)} ms` : "--"],
+    ["VLM inference time", result ? `${Math.round(result.vlm_time_ms)} ms` : "--", simulated],
   ];
 
   return (
@@ -46,7 +46,10 @@ export function DiagnosisPanel({ diagnosis, telemetry }: { diagnosis: Diagnosis;
       {sent && sentUrl && (
         <figure className="sent">
           <img src={sentUrl} alt="Composite sent to the VLM" />
-          <figcaption>{`Sent to VLM: baseline | target, ${sent.width} x ${sent.height} px`}</figcaption>
+          <figcaption>
+            <span>Sent to VLM</span>
+            <b>{`baseline | target · ${sent.width}×${sent.height} px`}</b>
+          </figcaption>
         </figure>
       )}
 
@@ -98,10 +101,10 @@ export function DiagnosisPanel({ diagnosis, telemetry }: { diagnosis: Diagnosis;
       )}
 
       <dl className="telemetry">
-        {cells.map(([label, value]) => (
+        {cells.map(([label, value, sim]) => (
           <div key={label}>
             <dt>{label}</dt>
-            <dd>{value}</dd>
+            <dd>{value}{sim && <i className="tag">simulated</i>}</dd>
           </div>
         ))}
       </dl>

@@ -75,7 +75,7 @@ describe("DiagnosisPanel", () => {
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
     const sent = { blob: new Blob(["x"], { type: "image/png" }), width: 108, height: 30 };
     const { unmount } = render(<DiagnosisPanel diagnosis={{ ...done, sent }} telemetry={telemetry} />);
-    expect(screen.getByText("Sent to VLM: baseline | target, 108 x 30 px")).toBeInTheDocument();
+    expect(screen.getByText("baseline | target · 108×30 px")).toBeInTheDocument();
     expect(screen.getByAltText("Composite sent to the VLM")).toHaveAttribute("src", "blob:sent");
     unmount();
     expect(revoke).toHaveBeenCalledWith("blob:sent");

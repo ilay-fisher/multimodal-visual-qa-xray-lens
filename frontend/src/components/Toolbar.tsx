@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PresetOut, VlmBackend } from "../types";
 
 export interface ToolbarProps {
@@ -29,20 +29,38 @@ export function Toolbar(props: ToolbarProps) {
   const [open, setOpen] = useState<Popover>(null);
   const [baseline, setBaseline] = useState<File | null>(null);
   const [target, setTarget] = useState<File | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const openers = useRef<Record<string, HTMLButtonElement | null>>({});
+  /** Closes the open sheet; Escape also returns focus to the chip that opened it. */
+  const close = (restoreFocus: boolean) => {
+    if (restoreFocus && open) openers.current[open]?.focus();
+    setOpen(null);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => root.current && !root.current.contains(e.target as Node) && setOpen(null);
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [open]);
+  // Keep the active slide in view in the horizontally scrolling mobile row.
+  useEffect(() => {
+    const el = root.current?.querySelector<HTMLElement>(".chips [aria-pressed=true]");
+    el?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+  }, [presetId, presets.length]);
   const toggle = (p: Exclude<Popover, null>) => setOpen((cur) => (cur === p ? null : p));
   const pick = (set: (f: File | null) => void) => (e: React.ChangeEvent<HTMLInputElement>) =>
     set(e.target.files?.[0] ?? null);
   const current = BACKENDS.find((b) => b.id === backend) ?? BACKENDS[0];
 
   return (
-    <div className="tray" onKeyDown={(e) => e.key === "Escape" && setOpen(null)}>
+    <div className="tray" ref={root} onKeyDown={(e) => e.key === "Escape" && close(true)}>
       <div className="chips" role="group" aria-label="Presets">
         {presets.map((p) => (
           <button key={p.id} type="button" className="chip" aria-pressed={presetId === p.id} onClick={() => props.onPresetChange(p.id)}>
             {p.label}
           </button>
         ))}
-        <button type="button" className="chip chip-add" aria-pressed={presetId === null} aria-expanded={open === "pair"} aria-haspopup="dialog" onClick={() => toggle("pair")}>
+        <button type="button" ref={(el) => { openers.current.pair = el; }} className="chip chip-add" aria-pressed={presetId === null} aria-expanded={open === "pair"} aria-haspopup="dialog" onClick={() => toggle("pair")}>
           + your pair
         </button>
       </div>
@@ -63,7 +81,7 @@ export function Toolbar(props: ToolbarProps) {
       </label>
 
       <div className="engine">
-        <button type="button" className="chip" aria-expanded={open === "engine"} aria-haspopup="menu" onClick={() => toggle("engine")}>
+        <button type="button" ref={(el) => { openers.current.engine = el; }} className="chip" aria-expanded={open === "engine"} aria-haspopup="menu" onClick={() => toggle("engine")}>
           <span className="dim">engine</span> {current.short}
           {current.tag && <i className="tag">{current.tag}</i>}
         </button>

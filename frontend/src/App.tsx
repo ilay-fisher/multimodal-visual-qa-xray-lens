@@ -116,6 +116,7 @@ export default function App() {
         </div>
         <DiagnosisPanel
           diagnosis={diagnosis}
+          simulated={backend === "demo"}
           telemetry={{ cvTimeMs: data?.cv_time_ms ?? 0, pixelsFilteredPct: data?.pixels_filtered_pct ?? 0, tokenSavingsPct: data?.estimated_token_savings_pct ?? 0 }}
         />
       </main>
