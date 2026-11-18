@@ -56,11 +56,23 @@
 
   <h2>Wave 2 - after wave 1 merged</h2>
   <div class="wave">
-    <div class="card"><h3>agent-api <span class="tag wip">in progress</span></h3>
+    <div class="card"><h3>agent-api <span class="tag done">merged</span></h3>
       <code>feat/api</code>
       <ul><li>app/main.py (inspect, analyze-roi SSE, cost guards)</li><li>app/benchmark.py</li><li>tests/test_api.py</li></ul></div>
+    <div class="card"><h3>manager <span class="tag done">done</span></h3>
+      <ul><li>Live oMLX run: 7/7 valid reports, ROI ~3-4 s, full frame ~5-7 s</li><li>Found: PCB labels swapped (model sees target only)</li><li>Decision: baseline|target ROI composite (CONTRACTS section 8)</li></ul></div>
+  </div>
+
+  <h2>Wave 3 - ROI pair composite + hardening</h2>
+  <div class="wave">
+    <div class="card"><h3>agent-api <span class="tag wip">in progress</span></h3>
+      <code>feat/roi-pair-backend</code>
+      <ul><li>compose_pair, layout-aware prompt</li><li>Demo half-comparison heuristics, natural evidence</li><li>Benchmark on composites, simulated latency labelled</li><li>500 access log, proxy headers, FRONTEND_PORT</li></ul></div>
+    <div class="card"><h3>agent-frontend <span class="tag wip">in progress</span></h3>
+      <code>feat/roi-pair-frontend</code>
+      <ul><li>crop.ts composite builder</li><li>"Sent to VLM" payload thumbnail</li><li>Inline SVG favicon</li></ul></div>
     <div class="card"><h3>manager <span class="tag todo">pending</span></h3>
-      <ul><li>End-to-end run (demo + local oMLX)</li><li>Visual check in browser</li><li>Final README numbers</li></ul></div>
+      <ul><li>Re-run live oMLX, confirm PCB labels</li><li>Real benchmark (--backend local)</li><li>docker compose check, final README</li></ul></div>
   </div>
 
   <h2>PR log</h2>
@@ -69,7 +81,8 @@
     <tr><td>#2</td><td>feat/vlm-client</td><td class="done">merged</td><td>After fixes: public docstrings, no tracebacks on SDK errors, StrEnum. 50 tests.</td></tr>
     <tr><td>#3</td><td>feat/frontend</td><td class="done">merged</td><td>Screenshots reviewed (1440px, 375px). Styled file pickers requested and applied.</td></tr>
     <tr><td>#4</td><td>feat/cv-pipeline</td><td class="done">merged</td><td>Manager re-ran red test commit and overlays. E501 + brand rename fixed. 75 tests.</td></tr>
-    <tr><td>-</td><td>fix/frontend-docker</td><td class="wip">in progress</td><td>Rollup "nested too deeply" on node:22-alpine; build stage moves to node:22-slim.</td></tr>
+    <tr><td>#5</td><td>fix/frontend-docker</td><td class="done">merged</td><td>Rollup "nested too deeply" on node:22-alpine (musl); build stage moved to node:22-slim.</td></tr>
+    <tr><td>#6</td><td>feat/api</td><td class="done">merged</td><td>SSE + cost guards + benchmark. 104 tests, CI green. Follow-ups moved to wave 3.</td></tr>
   </table>
 </main>
 </body>
