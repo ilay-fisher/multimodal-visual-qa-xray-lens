@@ -1,6 +1,6 @@
 # X-Ray Lens redesign: art direction and proposal
 
-Status: Phase 1, waiting for owner approval. No code changed.
+Status: implemented in PRs 16 to 20 (the README update is PR 6 itself), 2026-11-18.
 Before frames: `docs/redesign/before/` (desktop-idle, desktop-diagnosis, mobile-idle, mobile-diagnosis).
 
 ## What is weak today (from the before frames)
