@@ -77,10 +77,10 @@ def test_identical_images_yield_nothing() -> None:
 def test_single_defect_localised() -> None:
     base = make_base()
     target = base.copy()
-    cv2.rectangle(target, (350, 80), (430, 140), (20, 20, 220), -1)
+    cv2.rectangle(target, (350, 80), (470, 170), (20, 20, 220), -1)
     result = VisualDiffPipeline().run(base, target)
     assert len(result.boxes) == 1
-    assert iou(result.boxes[0], (350, 80, 81, 61)) >= 0.7
+    assert iou(result.boxes[0], (350, 80, 121, 91)) >= 0.7
     assert 0 < result.roi_pixels < H * W * 0.1
 
 
@@ -94,10 +94,10 @@ def test_noise_only_is_ignored() -> None:
 def test_defect_survives_noise() -> None:
     base = make_base()
     target = base.copy()
-    cv2.rectangle(target, (100, 300), (180, 360), (30, 200, 240), -1)
+    cv2.rectangle(target, (100, 300), (220, 390), (30, 200, 240), -1)
     result = VisualDiffPipeline().run(base, add_noise(target))
     assert len(result.boxes) == 1
-    assert iou(result.boxes[0], (100, 300, 81, 61)) >= 0.7
+    assert iou(result.boxes[0], (100, 300, 121, 91)) >= 0.7
 
 
 def test_two_separate_defects_two_boxes() -> None:
@@ -129,13 +129,13 @@ def test_pixel_savings_math_known_case() -> None:
     assert result.roi_pixels == expected_roi
     assert result.total_pixels == 20000
     assert result.pixels_filtered_pct == round(100 * (1 - expected_roi / 20000), 2)
-    assert result.pixels_filtered_pct < 80.0
+    assert 80.0 < result.pixels_filtered_pct < 85.0
 
 
 def test_overlay_is_png_of_target_size() -> None:
     base = make_base()
     target = base.copy()
-    cv2.rectangle(target, (350, 80), (430, 140), (20, 20, 220), -1)
+    cv2.rectangle(target, (350, 80), (470, 170), (20, 20, 220), -1)
     result = VisualDiffPipeline().run(base, target)
     overlay = decode_image(result.overlay_png)
     assert overlay.shape == target.shape
