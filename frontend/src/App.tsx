@@ -68,11 +68,13 @@ export default function App() {
       stream.current = ctl;
       setSelectedId(box.id);
       setDiagnosis({ status: "streaming", raw: "" });
+      // Where the specimen flies from: the clicked region, measured now (the region keeps its pinned state).
+      const from = document.querySelector(`[data-roi="${box.id}"]`)?.getBoundingClientRect();
       const context = presets.find((p) => p.id === presetId)?.domain_context ?? "generic";
       try {
         const png = (b64: string) => `data:image/png;base64,${b64}`;
         const sent = await cropPairToPng(png(data.baseline_png_b64), png(data.target_png_b64), box);
-        setDiagnosis((d) => ({ ...d, sent }));
+        setDiagnosis((d) => ({ ...d, sent: { ...sent, from } }));
         for await (const ev of analyzeRoi(sent.blob, context, backend, ctl.signal)) {
           if (ev.event === "token") setDiagnosis((d) => ({ ...d, raw: d.raw + ev.data.text }));
           else if (ev.event === "result") setDiagnosis((d) => ({ ...d, status: "done", result: ev.data }));
