@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { ErrorCode, ResultData } from "../types";
 
 export interface Diagnosis {
@@ -5,6 +6,8 @@ export interface Diagnosis {
   /** Concatenated raw token text received so far. */
   raw: string;
   result?: ResultData;
+  /** The exact composite image (baseline | target) sent to the VLM. */
+  sent?: { blob: Blob; width: number; height: number };
   error?: { message: string; code: ErrorCode | "network" };
 }
 
@@ -16,7 +19,14 @@ export interface Telemetry {
 
 /** Streaming diagnosis card plus the four-cell telemetry bar. */
 export function DiagnosisPanel({ diagnosis, telemetry }: { diagnosis: Diagnosis; telemetry: Telemetry }) {
-  const { status, result } = diagnosis;
+  const { status, result, sent } = diagnosis;
+  const [sentUrl, setSentUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sent) return setSentUrl(null);
+    const url = URL.createObjectURL(sent.blob);
+    setSentUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [sent]);
   const report = result?.report;
   const cells: [string, string][] = [
     ["CV preprocess time", `${telemetry.cvTimeMs.toFixed(1)} ms`],
@@ -32,6 +42,13 @@ export function DiagnosisPanel({ diagnosis, telemetry }: { diagnosis: Diagnosis;
         {result && <span className="chip">{result.backend}</span>}
         {result?.cached && <span className="chip chip-cached">cached</span>}
       </header>
+
+      {sent && sentUrl && (
+        <figure className="sent">
+          <img src={sentUrl} alt="Composite sent to the VLM" />
+          <figcaption>{`Sent to VLM: baseline | target, ${sent.width} x ${sent.height} px`}</figcaption>
+        </figure>
+      )}
 
       {status === "idle" && <p className="hint">Select a flagged region on the image to send only that crop to the vision model.</p>}
 
