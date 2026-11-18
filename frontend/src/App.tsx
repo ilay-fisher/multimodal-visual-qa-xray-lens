@@ -3,7 +3,7 @@ import { analyzeRoi, getPresets, inspect } from "./api";
 import { DiagnosisPanel, type Diagnosis } from "./components/DiagnosisPanel";
 import { Toolbar } from "./components/Toolbar";
 import { XRaySlider } from "./components/XRaySlider";
-import { cropToPng } from "./lib/crop";
+import { cropPairToPng } from "./lib/crop";
 import { logError } from "./lib/log";
 import type { BoxOut, InspectResponse, PresetOut, VlmBackend } from "./types";
 
@@ -70,8 +70,10 @@ export default function App() {
       setDiagnosis({ status: "streaming", raw: "" });
       const context = presets.find((p) => p.id === presetId)?.domain_context ?? "generic";
       try {
-        const roi = await cropToPng(`data:image/png;base64,${data.target_png_b64}`, box);
-        for await (const ev of analyzeRoi(roi, context, backend, ctl.signal)) {
+        const png = (b64: string) => `data:image/png;base64,${b64}`;
+        const sent = await cropPairToPng(png(data.baseline_png_b64), png(data.target_png_b64), box);
+        setDiagnosis((d) => ({ ...d, sent }));
+        for await (const ev of analyzeRoi(sent.blob, context, backend, ctl.signal)) {
           if (ev.event === "token") setDiagnosis((d) => ({ ...d, raw: d.raw + ev.data.text }));
           else if (ev.event === "result") setDiagnosis((d) => ({ ...d, status: "done", result: ev.data }));
           else if (ev.event === "error") setDiagnosis((d) => ({ ...d, status: "error", error: ev.data }));
