@@ -1,0 +1,20 @@
+[
+  {
+    "id": "pcb_board",
+    "label": "PCB Hardware Inspection",
+    "domain_context": "pcb",
+    "expected_defects": 2
+  },
+  {
+    "id": "aerial_crop",
+    "label": "Aerial Crop Monitoring",
+    "domain_context": "aerial",
+    "expected_defects": 1
+  },
+  {
+    "id": "ui_layout",
+    "label": "UI Regression Check",
+    "domain_context": "ui",
+    "expected_defects": 1
+  }
+]
