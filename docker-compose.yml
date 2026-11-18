@@ -1,0 +1,37 @@
+services:
+  backend:
+    build: ./backend
+    image: xray-backend:latest
+    ports:
+      - "8080:8080"
+    # Optional: copy backend/.env.example to backend/.env to configure the VLM.
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      # Reach an oMLX / Ollama server running on the host machine.
+      LOCAL_VLM_BASE_URL: ${LOCAL_VLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: xray-frontend:latest
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
