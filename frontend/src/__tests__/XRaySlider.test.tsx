@@ -309,6 +309,20 @@ describe("XRaySlider: lock-on", () => {
     expect(regions().map((r) => r.style.getPropertyValue("--d"))).toEqual(["0ms", "90ms"]);
   });
 
+  it("never leaves regions hidden: no IntersectionObserver, or one that never fires", () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    sessionStorage.clear();
+    const first = setup();
+    advance(2800); // sweep runs on mount without an observer
+    expect(regions()[0]).toHaveAttribute("data-lock", "lock");
+    first.unmount();
+    mockObserver(); // exists, but the stage never reports as visible
+    setup();
+    expect(regions()[0]).toHaveAttribute("data-lock", "wait");
+    advance(1300);
+    expect(regions()[0]).toHaveAttribute("data-lock", "lock");
+  });
+
   it("locks on right away when the sweep was already seen", () => {
     setup();
     act(() => visible?.());
