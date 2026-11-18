@@ -65,14 +65,23 @@
 
   <h2>Wave 3 - ROI pair composite + hardening</h2>
   <div class="wave">
-    <div class="card"><h3>agent-api <span class="tag wip">in progress</span></h3>
+    <div class="card"><h3>agent-api <span class="tag done">merged</span></h3>
       <code>feat/roi-pair-backend</code>
       <ul><li>compose_pair, layout-aware prompt</li><li>Demo half-comparison heuristics, natural evidence</li><li>Benchmark on composites, simulated latency labelled</li><li>500 access log, proxy headers, FRONTEND_PORT</li></ul></div>
     <div class="card"><h3>agent-frontend <span class="tag done">merged</span></h3>
       <code>feat/roi-pair-frontend</code>
       <ul><li>crop.ts composite builder</li><li>"Sent to VLM" payload thumbnail</li><li>Inline SVG favicon</li></ul></div>
-    <div class="card"><h3>manager <span class="tag todo">pending</span></h3>
-      <ul><li>Re-run live oMLX, confirm PCB labels</li><li>Real benchmark (--backend local)</li><li>docker compose check, final README</li></ul></div>
+    <div class="card"><h3>manager <span class="tag wip">in progress</span></h3>
+      <ul><li>Done: live oMLX re-run (3/4 labels right, U2 still wrong on 7B), real local benchmark, compose check</li><li>Pending: stronger-model comparison, final README</li></ul></div>
+  </div>
+
+  <h2>Wave 4 - abuse protection</h2>
+  <div class="wave">
+    <div class="card"><h3>agent-infra <span class="tag done">merged</span></h3>
+      <code>feat/edge-rate-limit</code>
+      <ul><li>nginx per-IP limits: 10 r/m heavy, 60 r/m rest, 10 conns</li><li>Excess returns 429</li><li>Manager burst check: 6 x 200, 14 x 429</li></ul></div>
+    <div class="card"><h3>owner <span class="tag todo">pending</span></h3>
+      <ul><li>Anthropic console: dedicated workspace with its own spend limit</li><li>Key from that workspace in backend/.env</li></ul></div>
   </div>
 
   <h2>PR log</h2>
@@ -84,6 +93,10 @@
     <tr><td>#5</td><td>fix/frontend-docker</td><td class="done">merged</td><td>Rollup "nested too deeply" on node:22-alpine (musl); build stage moved to node:22-slim.</td></tr>
     <tr><td>#6</td><td>feat/api</td><td class="done">merged</td><td>SSE + cost guards + benchmark. 104 tests, CI green. Follow-ups moved to wave 3.</td></tr>
     <tr><td>#7</td><td>feat/roi-pair-frontend</td><td class="done">merged</td><td>Composite builder + "Sent to VLM" thumbnail + favicon. 21 tests, 594/610 lines. Screenshot verified.</td></tr>
+    <tr><td>#8</td><td>feat/roi-pair-backend</td><td class="done">merged</td><td>Sent back once for line budget (1,638). Final 1,598/1,600. Shared gap constants.</td></tr>
+    <tr><td>#9</td><td>fix/solder-bridge-sample</td><td class="done">merged</td><td>Realistic solder bridge. 7B model still labels it missing_component (model limit).</td></tr>
+    <tr><td>#10</td><td>fix/forwarded-ip-trust</td><td class="done">merged</td><td>Security fix: spoofed X-Forwarded-For could bypass rate limit. 115 tests.</td></tr>
+    <tr><td>#11</td><td>feat/edge-rate-limit</td><td class="done">merged</td><td>TDD order ok. Manager re-ran burst on compose: 6 x 200, 14 x 429. 123 tests, CI green.</td></tr>
   </table>
 </main>
 </body>
