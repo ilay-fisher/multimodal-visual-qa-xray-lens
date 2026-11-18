@@ -47,20 +47,10 @@ function useSpringIn(still: boolean, hold: boolean, target: number): { go: boole
 }
 
 interface PairProps {
-  id: string;
-  title: string;
-  unit: string;
-  tag: string;
-  source?: string;
-  full: number;
-  roi: number;
-  format: (n: number) => string;
-  /** Words after the saving, e.g. "fewer" or "faster". */
-  noun: string;
-  /** Spoken sentence for the whole pair. */
-  spoken: string;
-  animated: boolean;
-  hold: boolean;
+  id: string; title: string; unit: string; tag: string; source?: string;
+  full: number; roi: number; format: (n: number) => string;
+  /** Words after the saving ("fewer", "saved"), the sentence a screen reader gets for the pair, and whether it springs in. */
+  noun: string; spoken: string; animated: boolean; hold: boolean;
 }
 
 /** One Full frame / Regions bar pair. Mount it with a `key` of its data so new data replays the entrance. */
