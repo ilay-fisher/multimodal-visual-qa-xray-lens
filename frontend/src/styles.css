@@ -42,8 +42,11 @@ select { min-width: 200px; max-width: 100%; }
 .upload { display: flex; flex-wrap: wrap; align-items: end; gap: 4px 10px; border: 0; padding: 0; margin: 0 0 0 auto; min-width: 0; }
 .upload legend { padding: 0; margin-bottom: 4px; }
 .upload legend + .file { margin-left: 0; }
-.file { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
-.file input { max-width: 190px; font-size: 12px; }
+.file { position: relative; display: inline-flex; align-items: center; max-width: 170px; min-height: 34px; padding: 6px 10px; cursor: pointer; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 4px; color: var(--muted); }
+.file:hover { border-color: var(--muted); }
+.file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.file:has(input:focus-visible) { outline: 2px solid var(--sel); outline-offset: 2px; }
 .btn { cursor: pointer; background: var(--heat); border-color: var(--heat); color: #1a0a02; font-weight: 600; }
 .btn:disabled { background: var(--panel-2); border-color: var(--line-2); color: var(--muted); cursor: not-allowed; }
 

@@ -69,14 +69,14 @@ export function Toolbar(props: ToolbarProps) {
 
       <fieldset className="upload">
         <legend>Custom pair</legend>
-        <label className="file">
-          <span>Baseline image</span>
-          <input type="file" accept="image/*" onChange={pick(setBaseline)} />
-        </label>
-        <label className="file">
-          <span>Target image</span>
-          <input type="file" accept="image/*" onChange={pick(setTarget)} />
-        </label>
+        {([["Baseline image", "Baseline...", baseline, setBaseline], ["Target image", "Target...", target, setTarget]] as const).map(
+          ([aria, hint, file, set]) => (
+            <label key={aria} className="file">
+              <input type="file" accept="image/*" aria-label={aria} onChange={pick(set)} />
+              <span>{file?.name ?? hint}</span>
+            </label>
+          ),
+        )}
         <button
           type="button"
           className="btn"

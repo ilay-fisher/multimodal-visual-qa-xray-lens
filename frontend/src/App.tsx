@@ -68,7 +68,7 @@ export default function App() {
       stream.current = ctl;
       setSelectedId(box.id);
       setDiagnosis({ status: "streaming", raw: "" });
-      const context = presets.find((p) => p.id === presetId)?.domain_context ?? "general";
+      const context = presets.find((p) => p.id === presetId)?.domain_context ?? "generic";
       try {
         const roi = await cropToPng(`data:image/png;base64,${data.target_png_b64}`, box);
         for await (const ev of analyzeRoi(roi, context, backend, ctl.signal)) {
