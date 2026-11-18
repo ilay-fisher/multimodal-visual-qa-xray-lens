@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DiagnosisPanel, type Diagnosis } from "../components/DiagnosisPanel";
 
-const telemetry = { cvTimeMs: 12.4, pixelsFilteredPct: 97.8, tokenSavingsPct: 97.7 };
+const telemetry = { cvTimeMs: 29.4, pixelsFilteredPct: 99.4, fullFrameTokens: 2460, roiTokens: 121 };
 
 const done: Diagnosis = {
   status: "done",
@@ -48,14 +48,6 @@ describe("DiagnosisPanel", () => {
     expect(screen.getByText("Pads at U3 are bare.")).toBeInTheDocument();
     expect(screen.getByText("Reflow and place the part.")).toBeInTheDocument();
     expect(screen.getByText(/cached/i)).toBeInTheDocument();
-  });
-
-  it("renders all four telemetry values", () => {
-    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
-    expect(screen.getByText("12.4 ms")).toBeInTheDocument();
-    expect(screen.getByText("97.8%")).toBeInTheDocument();
-    expect(screen.getByText("97.7%")).toBeInTheDocument();
-    expect(screen.getByText("412 ms")).toBeInTheDocument();
   });
 
   it("shows the raw token stream while streaming", () => {
@@ -227,5 +219,124 @@ describe("specimen flight", () => {
     render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent: { ...sent, from: undefined } }} telemetry={telemetry} />);
     fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
     expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe("savings instrument", () => {
+  const widthOf = (id: string) => parseFloat((document.querySelector<HTMLElement>(`[data-bar="${id}"]`) as HTMLElement).style.width);
+  afterEach(() => media(false));
+
+  it("replaces the four-cell telemetry grid", () => {
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
+    expect(document.querySelector(".telemetry")).toBeNull();
+    expect(screen.getByRole("group", { name: "Full frame vs regions" })).toBeInTheDocument();
+  });
+
+  it("states the token pair as text for screen readers, with the unit and the saving", () => {
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
+    expect(screen.getByText("Full frame 2,460 est. tokens, regions 121, 95.1% fewer")).toBeInTheDocument();
+  });
+
+  it("draws Regions as its share of Full frame under reduced motion, with no roll", () => {
+    media(true);
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
+    expect(widthOf("tokens-full")).toBe(100);
+    expect(widthOf("tokens-regions")).toBeCloseTo(4.92, 1);
+    expect(document.querySelector("[data-counter]")).toHaveTextContent("95.1%");
+  });
+
+  it("keeps a tiny ratio visible as a sliver while the number stays honest", () => {
+    media(true);
+    render(<DiagnosisPanel diagnosis={done} telemetry={{ ...telemetry, fullFrameTokens: 100000, roiTokens: 1 }} />);
+    expect(widthOf("tokens-regions")).toBeGreaterThan(0);
+    expect(screen.getByText("Full frame 100,000 est. tokens, regions 1, 99.9% fewer")).toBeInTheDocument();
+  });
+
+  it("shows the measured benchmark, tagged measured, with its source and the README numbers", () => {
+    media(true);
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
+    expect(screen.getByText("measured")).toBeInTheDocument();
+    expect(screen.getByText("benchmark · Haiku 5.5 · 4 regions")).toBeInTheDocument();
+    expect(screen.getByText(/Full frame 17,838 ms, regions 10,034 ms, 43\.7% faster/)).toBeInTheDocument();
+    expect(widthOf("latency-regions")).toBeCloseTo((10034 / 17838) * 100, 1);
+  });
+
+  it("tags the token estimate live and keeps the benchmark out of this call's time", () => {
+    render(<DiagnosisPanel diagnosis={{ status: "idle", raw: "" }} telemetry={telemetry} />);
+    expect(screen.getAllByText("live").length).toBeGreaterThan(0);
+    const call = screen.getByText("This call").closest("div")!;
+    expect(call).toHaveTextContent("–");
+    expect(call).not.toHaveTextContent("10,034");
+  });
+
+  it("shows this call's VLM time, simulated in demo and live otherwise", () => {
+    const { rerender } = render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} simulated />);
+    const call = () => screen.getByText("This call").closest("div")!;
+    expect(call()).toHaveTextContent("412 ms");
+    expect(within(call()).getByText("simulated")).toBeInTheDocument();
+    rerender(<DiagnosisPanel diagnosis={done} telemetry={telemetry} simulated={false} />);
+    expect(call()).toHaveTextContent("412 ms");
+    expect(within(call()).getByText("live")).toBeInTheDocument();
+    expect(within(call()).queryByText("simulated")).toBeNull();
+  });
+
+  it("keeps CV time and pixels filtered as one quiet line", () => {
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
+    expect(screen.getByText(/^CV 29 ms · 99\.4% pixels filtered/)).toBeInTheDocument();
+  });
+
+  it("carries the accent on the Regions bars only", () => {
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
+    const accented = [...document.querySelectorAll<HTMLElement>("[data-bar][data-accent]")].map((e) => e.dataset.bar);
+    expect(accented).toEqual(["tokens-regions", "latency-regions"]);
+  });
+
+  it("shows nothing invented when there is no data yet, or when regions exceed the frame", () => {
+    media(true);
+    const { rerender } = render(<DiagnosisPanel diagnosis={done} telemetry={{ ...telemetry, fullFrameTokens: 0, roiTokens: 0 }} />);
+    expect(screen.queryByText(/est\. tokens/)).toBeNull();
+    rerender(<DiagnosisPanel diagnosis={done} telemetry={{ ...telemetry, fullFrameTokens: 100, roiTokens: 300 }} />);
+    expect(screen.getByText("Full frame 100 est. tokens, regions 300")).toBeInTheDocument();
+    expect(widthOf("tokens-regions")).toBe(100);
+  });
+
+  it("springs Regions down from the full-frame length and rolls the counter, once per new data", async () => {
+    const { rerender } = render(<DiagnosisPanel diagnosis={{ status: "idle", raw: "" }} telemetry={telemetry} />);
+    expect(widthOf("tokens-regions")).toBe(100);
+    expect(document.querySelector("[data-counter]")).toHaveTextContent("0.0%");
+    await waitFor(() => expect(widthOf("tokens-regions")).toBeCloseTo(4.92, 1));
+    await waitFor(() => expect(document.querySelector("[data-counter]")).toHaveTextContent("95.1%"), { timeout: 3000 });
+    // a region click changes the diagnosis, not the data: the bars do not replay
+    const same = { ...telemetry };
+    rerender(<DiagnosisPanel diagnosis={done} telemetry={{ ...same }} />);
+    expect(widthOf("tokens-regions")).toBeCloseTo(4.92, 1);
+    // new data replays them
+    rerender(<DiagnosisPanel diagnosis={done} telemetry={{ ...same, roiTokens: 60 }} />);
+    expect(widthOf("tokens-regions")).toBe(100);
+  });
+});
+
+describe("one loud motion at a time", () => {
+  const from = { left: 40, top: 30, width: 60, height: 30 } as DOMRect;
+  const sent = { blob: new Blob(["x"]), width: 242, height: 75, from };
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (HTMLElement.prototype as { animate?: unknown }).animate;
+  });
+
+  it("holds the bars at full length while the region flight runs, then lets them spring", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    const flight: { onfinish?: () => void } = {};
+    Object.assign(HTMLElement.prototype, { animate: vi.fn(() => flight) });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: 400, top: 500, width: 240, height: 90 } as DOMRect);
+    const bar = () => parseFloat(document.querySelector<HTMLElement>('[data-bar="tokens-regions"]')!.style.width);
+    const { rerender } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent }} telemetry={{ ...telemetry, roiTokens: 200 }} />);
+    fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
+    rerender(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent }} telemetry={telemetry} />);
+    await new Promise((r) => setTimeout(r, 80));
+    expect(bar()).toBe(100);
+    act(() => flight.onfinish?.());
+    await waitFor(() => expect(bar()).toBeCloseTo(4.92, 1));
   });
 });
