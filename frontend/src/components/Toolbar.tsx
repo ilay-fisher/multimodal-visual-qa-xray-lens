@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { nextFocus } from "../lib/focus";
 import type { PresetOut, VlmBackend } from "../types";
 
 export interface ToolbarProps {
@@ -19,6 +20,7 @@ const BACKENDS: { id: VlmBackend; label: string; short: string; tag?: string }[]
 ];
 
 type Popover = "pair" | "engine" | null;
+const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
 
 /**
  * Tray under the stage: preset slides, a "+ your pair" upload sheet, a sensitivity range
@@ -29,6 +31,8 @@ export function Toolbar(props: ToolbarProps) {
   const [open, setOpen] = useState<Popover>(null);
   const [baseline, setBaseline] = useState<File | null>(null);
   const [target, setTarget] = useState<File | null>(null);
+  /** Presets whose static thumbnail failed to load (unknown id, offline): those chips stay text only. */
+  const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
   const root = useRef<HTMLDivElement>(null);
   const openers = useRef<Record<string, HTMLButtonElement | null>>({});
   /** Closes the open sheet; Escape also returns focus to the chip that opened it. */
@@ -38,9 +42,16 @@ export function Toolbar(props: ToolbarProps) {
   };
   useEffect(() => {
     if (!open) return;
-    const away = (e: MouseEvent) => root.current && !root.current.contains(e.target as Node) && setOpen(null);
-    document.addEventListener("mousedown", away);
-    return () => document.removeEventListener("mousedown", away);
+    // Focus moves into the sheet when it opens; a click outside closes it and, unless it landed on another control, returns focus to the chip.
+    root.current?.querySelector(".sheet")?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const away = (e: MouseEvent) => {
+      const t = e.target as Element;
+      if (root.current?.contains(t)) return;
+      if (!t.closest?.("button, input, a, select, textarea, summary")) openers.current[open]?.focus();
+      setOpen(null);
+    };
+    document.addEventListener("click", away);
+    return () => document.removeEventListener("click", away);
   }, [open]);
   // Keep the active slide in view in the horizontally scrolling mobile row.
   useEffect(() => {
@@ -50,16 +61,28 @@ export function Toolbar(props: ToolbarProps) {
   const toggle = (p: Exclude<Popover, null>) => setOpen((cur) => (cur === p ? null : p));
   const pick = (set: (f: File | null) => void) => (e: React.ChangeEvent<HTMLInputElement>) =>
     set(e.target.files?.[0] ?? null);
+  /** Focus trap: Tab and Shift+Tab cycle inside the open sheet. */
+  const trap = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "Tab") return;
+    const next = nextFocus([...e.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE)], document.activeElement as HTMLElement, e.shiftKey);
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+  };
   const current = BACKENDS.find((b) => b.id === backend) ?? BACKENDS[0];
 
   return (
     <div className="tray" ref={root} onKeyDown={(e) => e.key === "Escape" && close(true)}>
       <div className="chips" role="group" aria-label="Presets">
-        {presets.map((p) => (
-          <button key={p.id} type="button" className="chip" aria-pressed={presetId === p.id} onClick={() => props.onPresetChange(p.id)}>
-            {p.label}
-          </button>
-        ))}
+        {presets.map((p) => {
+          const thumb = !broken.has(p.id);
+          return (
+            <button key={p.id} type="button" className={thumb ? "chip has-thumb" : "chip"} aria-pressed={presetId === p.id} onClick={() => props.onPresetChange(p.id)}>
+              {thumb && <img src={`${import.meta.env.BASE_URL}presets/${p.id}.webp`} alt="" width={64} height={44} draggable={false} onError={() => setBroken((b) => new Set(b).add(p.id))} />}
+              {p.label}
+            </button>
+          );
+        })}
         <button type="button" ref={(el) => { openers.current.pair = el; }} className="chip chip-add" aria-pressed={presetId === null} aria-expanded={open === "pair"} aria-haspopup="dialog" onClick={() => toggle("pair")}>
           + your pair
         </button>
@@ -86,14 +109,14 @@ export function Toolbar(props: ToolbarProps) {
           {current.tag && <i className="tag">{current.tag}</i>}
         </button>
         {open === "engine" && (
-          <div className="sheet" role="menu" aria-label="Engine">
+          <div className="sheet" role="menu" aria-label="Engine" onKeyDown={trap}>
             {BACKENDS.map((b) => (
               <button
                 key={b.id}
                 type="button"
                 role="menuitemradio"
                 aria-checked={backend === b.id}
-                onClick={() => { props.onBackendChange(b.id); setOpen(null); }}
+                onClick={() => { props.onBackendChange(b.id); close(true); }}
               >
                 {b.label}
                 {b.tag && <i className="tag">{b.tag}</i>}
@@ -104,7 +127,7 @@ export function Toolbar(props: ToolbarProps) {
       </div>
 
       {open === "pair" && (
-        <div className="sheet sheet-pair" role="dialog" aria-label="Your pair">
+        <div className="sheet sheet-pair" role="dialog" aria-label="Your pair" onKeyDown={trap}>
           {([["Baseline image", "Baseline", baseline, setBaseline], ["Target image", "Target", target, setTarget]] as const).map(
             ([aria, hint, file, set]) => (
               <label key={aria} className="file">
@@ -120,7 +143,7 @@ export function Toolbar(props: ToolbarProps) {
             onClick={() => {
               if (!baseline || !target) return;
               props.onUpload(baseline, target);
-              setOpen(null);
+              close(true);
             }}
           >
             Inspect uploads

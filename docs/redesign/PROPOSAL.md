@@ -111,7 +111,7 @@ Unchanged: backend, CV pipeline, API contract, rate limits, benchmark numbers. D
 
 ## Owner decisions (2026-11-18)
 
-- Line budget: frontend `src` non-test TS/TSX is raised to 1,500 lines. CSS, tests and mocks are not counted.
+- Line budget: frontend `src` non-test TS/TSX is raised to 1,500 lines, then to 1,600 for the polish PR (focus trap, diagnosis dock, thumbnails). CSS, tests and mocks are not counted.
 - Fonts: self-hosted with `@fontsource` (3 npm packages, all OFL).
 - Latency bar: uses the measured benchmark (Haiku 17,838 vs 10,034 ms), tagged `measured`. The live ROI time is shown separately, tagged `live`, or `simulated` in demo mode.
 - Lens: split mode only, plus hold to peek at the baseline. The circle lens is removed.

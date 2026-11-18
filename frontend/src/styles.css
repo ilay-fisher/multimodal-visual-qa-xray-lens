@@ -24,6 +24,9 @@
   --contact: 5px 7px 16px rgba(0, 0, 0, 0.45), 1px 2px 3px rgba(0, 0, 0, 0.5);
   --recess: inset 3px 4px 10px rgba(0, 0, 0, 0.6), inset -1px -1px 0 rgba(255, 255, 255, 0.04);
 
+  /* Dark 1 px outline for the lock-on brackets so they read on gold pads and on green board alike (CSS only). */
+  --halo: drop-shadow(1px 0 0 rgba(6, 8, 10, 0.92)) drop-shadow(-1px 0 0 rgba(6, 8, 10, 0.92)) drop-shadow(0 1px 0 rgba(6, 8, 10, 0.92)) drop-shadow(0 -1px 0 rgba(6, 8, 10, 0.92));
+
   --spring-soft: cubic-bezier(0.34, 1.3, 0.5, 1);
   --spring-soft-dur: 880ms;
   --spring-snappy: cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -90,6 +93,10 @@ button, select, input { font: inherit; color: inherit; }
 .chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .chip { font-size: 13px; }
 .chip-add { color: var(--text); }
+/* Preset slide: a 64x44 thumbnail in a recessed well, then the label. A failed image drops the .has-thumb class (text only). */
+.chip.has-thumb { display: inline-flex; align-items: center; gap: 10px; padding: 5px 16px 5px 5px; }
+.chip img { order: -2; flex: none; width: 64px; height: 44px; padding: 3px; border-radius: 12px; object-fit: cover; background: var(--well); box-shadow: var(--recess); filter: saturate(0.92) brightness(0.94); }
+[aria-pressed="true"].chip.has-thumb::before { order: -1; margin: 0; }
 .tag { font-style: normal; font-size: 10px; letter-spacing: 0.04em; margin-left: 8px; padding: 1px 7px; border-radius: var(--r-pill); background: var(--well); box-shadow: var(--recess); color: var(--muted); }
 .dim { color: var(--muted); font-size: 12px; margin-right: 2px; }
 [aria-pressed="true"].chip .dim { color: inherit; }
@@ -169,10 +176,10 @@ button, select, input { font: inherit; color: inherit; }
 /* Regions: four rounded corner brackets (.brk) and a mono label (.lbl). The base rules ARE the
    settled state (quiet light brackets); data-lock="lock" plays the lock-on once, delayed by --d.
    Paint colours only for the flash, hover/focus and the pinned region. */
-.roi { position: absolute; z-index: 6; padding: 0; background: transparent; border: 0; border-radius: var(--r-sm); color: rgba(236, 232, 223, 0.7); cursor: pointer; outline: none; transition: background-color 160ms, color 160ms; }
+.roi { position: absolute; z-index: 6; padding: 0; background: transparent; border: 0; border-radius: var(--r-sm); color: rgba(244, 240, 230, 0.92); cursor: pointer; outline: none; transition: background-color 160ms, color 160ms; }
 .roi[data-lock="wait"] { pointer-events: none; }
 .roi[data-lock="wait"] .brk, .roi[data-lock="wait"] .lbl { visibility: hidden; }
-.brk { --bw: 2px; position: absolute; inset: -3px; pointer-events: none; filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)); transition: color 160ms; }
+.brk { --bw: 2px; position: absolute; inset: -3px; pointer-events: none; filter: var(--halo) drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)); transition: color 160ms; }
 .brk i { position: absolute; width: min(12px, 30%); height: min(12px, 30%); border: 0 solid currentColor; }
 .brk i:nth-child(1) { left: 0; top: 0; border-width: var(--bw) 0 0 var(--bw); border-top-left-radius: 6px; }
 .brk i:nth-child(2) { right: 0; top: 0; border-width: var(--bw) var(--bw) 0 0; border-top-right-radius: 6px; }
@@ -185,17 +192,17 @@ button, select, input { font: inherit; color: inherit; }
 .roi:hover, .roi:focus-visible { color: var(--paint-hi); background: rgba(255, 255, 255, 0.035); }
 .roi:focus-visible .brk i { width: min(16px, 38%); height: min(16px, 38%); }
 .roi:hover .lbl, .roi:focus-visible .lbl { color: var(--paint-hi); }
-.roi[aria-pressed="true"] { color: var(--paint-hi); background: rgba(255, 179, 71, 0.07); }
-.roi[aria-pressed="true"] .brk { filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 7px rgba(255, 179, 71, 0.5)); animation: pin var(--spring-snappy-dur) var(--spring-snappy); }
-.roi[aria-pressed="true"] .brk { --bw: 3px; }
+/* Pinned = the region being diagnosed: brighter brackets, a clear ring, one settle pulse on the snappy spring, then static. */
+.roi[aria-pressed="true"] { color: #ffe3ad; background: rgba(255, 179, 71, 0.13); box-shadow: 0 0 0 1px rgba(255, 190, 90, 0.7), 0 0 22px rgba(255, 179, 71, 0.32); }
+.roi[aria-pressed="true"] .brk { --bw: 3px; filter: var(--halo) drop-shadow(0 0 8px rgba(255, 190, 90, 0.85)); animation: pin var(--spring-snappy-dur) var(--spring-snappy); }
 .roi[aria-pressed="true"] .lbl { background: var(--paint-hi); color: #1d1100; font-weight: 600; }
 /* Lock-on: converge from 1.6x with the snappy spring, one flash in paint-hi, label types in 25 ms/char. */
 .roi[data-lock="lock"] .brk { animation: lock-in var(--spring-snappy-dur) var(--spring-snappy) var(--d) backwards, flash 700ms ease-out var(--d) backwards; }
 .roi[data-lock="lock"] .lbl { animation: type calc(var(--n) * 25ms) steps(var(--n)) calc(var(--d) + var(--spring-snappy-dur)) backwards; }
 .roi[data-lock="lock"][aria-pressed="true"] .brk { animation: pin var(--spring-snappy-dur) var(--spring-snappy); }
 @keyframes lock-in { from { transform: scale(1.6); opacity: 0; } 35% { opacity: 1; } }
-@keyframes flash { 0%, 45% { color: var(--paint-hi); filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 9px rgba(255, 179, 71, 0.95)); } }
-@keyframes pin { from { transform: scale(1.14); } }
+@keyframes flash { 0%, 45% { color: var(--paint-hi); filter: var(--halo) drop-shadow(0 0 9px rgba(255, 179, 71, 0.95)); } }
+@keyframes pin { from { transform: scale(1.5); filter: var(--halo) drop-shadow(0 0 18px rgba(255, 215, 140, 1)); } }
 @keyframes type { from { clip-path: inset(0 100% 0 0); } }
 
 /* ---- Readout panel ---- */
@@ -266,11 +273,22 @@ button, select, input { font: inherit; color: inherit; }
 .cvline .tag { margin-left: 6px; white-space: nowrap; }
 .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
+/* Diagnosis dock: fixed to the bottom of the viewport (64 px band, see lib/dock.ts) while the readout is off screen. */
+.dock { position: fixed; z-index: 40; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 12px; width: min(calc(100vw - 32px), 460px); height: 52px; padding: 6px 18px 6px 6px; border: 0; border-radius: var(--r-pill); background: var(--body-hi); box-shadow: var(--rim), 6px 10px 26px rgba(0, 0, 0, 0.65); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: transform var(--spring-snappy-dur) var(--spring-snappy); }
+.dock:active { transform: translateX(-50%) scale(0.97); }
+.dock:focus-visible { outline: 2px solid var(--paint-hi); outline-offset: 3px; }
+.dock-well { flex: none; display: grid; place-items: center; width: 92px; height: 40px; border-radius: var(--r-pill); background: var(--well); box-shadow: var(--recess); }
+.dock-well img { max-width: 80px; max-height: 28px; border-radius: 4px; image-rendering: pixelated; box-shadow: var(--contact); }
+.dock-text { display: grid; min-width: 0; line-height: 1.25; }
+.dock-text b { font: 600 13px var(--sans); }
+.dock-text .num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--paint-hi); }
+
 @media (max-width: 960px) {
   .workspace { grid-template-columns: minmax(0, 1fr); }
+  .app { padding-bottom: 96px; }
 }
 @media (max-width: 520px) {
-  .app { padding: 14px 16px 32px; gap: 12px; }
+  .app { padding: 14px 16px 96px; gap: 12px; }
   .stage { --rail-room: 46px; box-shadow: 0 0 0 6px var(--well), 6px 8px 24px rgba(0, 0, 0, 0.55); }
   .sens input { flex: 1; width: auto; min-width: 0; }
   .engine { margin-left: auto; }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logError } from "../lib/log";
 import { BENCHMARK, atProgress, barFraction, formatCount, formatSaving, provenance, savingPct } from "../lib/savings";
 import { SPRING_SOFT, springStep, type SpringState } from "../lib/spring";
@@ -15,19 +15,20 @@ export interface Telemetry {
 /**
  * One eased progress (0..1, SPRING_SOFT, monotone) sets both the Regions bar and the counter, so they
  * agree at every frame and land together. Reduced motion, or `still`, shows the end state at once;
- * `hold` only delays the start.
+ * `hold` delays the start, and if it rises while the roll is running (a region was picked) the roll
+ * snaps to its end at once, so only the flight moves. A finished or snapped roll never restarts.
  */
 function useSpringIn(still: boolean, hold: boolean): number {
   const [p, setP] = useState(still ? 1 : 0);
-  const [go, setGo] = useState(still);
-  const release = !hold || go;
+  const phase = useRef<"wait" | "roll" | "done">(still ? "done" : "wait");
   useEffect(() => {
-    if (still) {
+    if (still || (hold && phase.current === "roll")) phase.current = "done";
+    if (phase.current === "done") {
       setP(1);
       return;
     }
-    if (!release) return;
-    setGo(true);
+    if (hold) return;
+    phase.current = "roll";
     let s: SpringState = { x: 0, v: 0 };
     let last: number | null = null;
     let top = 0, raf = 0; // top only ever rises: no overshoot, no dip back after it
@@ -36,12 +37,13 @@ function useSpringIn(still: boolean, hold: boolean): number {
       last = now;
       const rest = Math.abs(s.x - 1) < 0.001 && Math.abs(s.v) < 0.02;
       top = Math.max(top, Math.min(1, s.x));
+      if (rest) phase.current = "done";
       setP(rest ? 1 : top);
       if (!rest) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [still, release]);
+  }, [still, hold]);
   return p;
 }
 
