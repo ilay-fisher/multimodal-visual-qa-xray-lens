@@ -1,0 +1,10 @@
+fastapi==0.163.2
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
+opencv-python-headless==5.1.0.95
+numpy==2.5.5
+pydantic==2.14.3
+pydantic-settings==2.16.3
+httpx==0.28.1
+openai==3.55.0
+anthropic==2.10.0

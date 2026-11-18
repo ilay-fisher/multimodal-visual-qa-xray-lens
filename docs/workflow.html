@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X-Ray Lens Build Board</title>
+<style>
+  :root { --bg:#0f1218; --card:#171b24; --line:#2a3140; --text:#e6e9ef; --muted:#8a93a6;
+          --accent:#4fd1c5; --warn:#f6ad55; --ok:#68d391; --todo:#718096; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system, "Segoe UI", sans-serif; padding:24px 16px; }
+  main { max-width:1100px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:17px; margin:32px 0 12px; color:var(--accent); }
+  .sub { color:var(--muted); margin:0 0 16px; }
+  .wave { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card h3 { margin:0 0 6px; font-size:15px; } .card ul { margin:6px 0 0; padding-left:18px; color:var(--muted); font-size:13px; }
+  .tag { display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; border:1px solid currentColor; }
+  .todo{color:var(--todo)} .wip{color:var(--warn)} .done{color:var(--ok)}
+  code { background:#0b0e13; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .flow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .flow span { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px; }
+  .flow b { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td,th { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; }
+</style>
+</head>
+<body>
+<main>
+  <h1>X-Ray Lens - Build Board</h1>
+  <p class="sub">Manager: Opus (review + merge only). Workers: Sonnet subagents, one git worktree and branch each.
+  Contracts: <code>docs/CONTRACTS.md</code>.</p>
+
+  <h2>Per-agent workflow</h2>
+  <div class="flow">
+    <span>Read CONTRACTS.md</span><b>&rarr;</b><span>Branch <code>feat/&lt;area&gt;</code></span><b>&rarr;</b>
+    <span>Commit 1: failing tests only</span><b>&rarr;</b><span>Implement until green</span><b>&rarr;</b>
+    <span>Lint, types, logs, docs</span><b>&rarr;</b><span>Push + open PR</span><b>&rarr;</b>
+    <span>Manager review</span><b>&rarr;</b><span>Fix or merge</span>
+  </div>
+
+  <h2>Wave 1 - parallel, file-disjoint</h2>
+  <div class="wave">
+    <div class="card"><h3>agent-cv <span class="tag wip">in progress</span></h3>
+      <code>feat/cv-pipeline</code>
+      <ul><li>app/cv_pipeline.py</li><li>scripts/generate_samples.py + samples/</li><li>tests/test_pipeline.py</li></ul></div>
+    <div class="card"><h3>agent-vlm <span class="tag wip">in progress</span></h3>
+      <code>feat/vlm-client</code>
+      <ul><li>app/schemas.py, app/config.py</li><li>app/vlm_client.py (demo/local/cloud)</li><li>tests/test_vlm.py, tests/test_schemas.py</li></ul></div>
+    <div class="card"><h3>agent-frontend <span class="tag wip">in progress</span></h3>
+      <code>feat/frontend</code>
+      <ul><li>Vite + React + TS scaffold</li><li>XRaySlider, DiagnosisPanel, Toolbar</li><li>Vitest component tests, mock API</li></ul></div>
+    <div class="card"><h3>agent-infra <span class="tag wip">in progress</span></h3>
+      <code>feat/infra</code>
+      <ul><li>app/logging_config.py</li><li>Dockerfiles, docker-compose.yml</li><li>GitHub Actions CI, pyproject, .env.example, Makefile</li></ul></div>
+  </div>
+
+  <h2>Wave 2 - after wave 1 merged</h2>
+  <div class="wave">
+    <div class="card"><h3>agent-api <span class="tag todo">pending</span></h3>
+      <code>feat/api</code>
+      <ul><li>app/main.py (inspect, analyze-roi SSE, cost guards)</li><li>app/benchmark.py</li><li>tests/test_api.py</li></ul></div>
+    <div class="card"><h3>manager <span class="tag todo">pending</span></h3>
+      <ul><li>End-to-end run (demo + local oMLX)</li><li>Visual check in browser</li><li>Final README numbers</li></ul></div>
+  </div>
+
+  <h2>PR log</h2>
+  <table><tr><th>PR</th><th>Branch</th><th>Status</th><th>Review notes</th></tr>
+    <tr><td colspan="4" style="color:var(--muted)">No PRs yet.</td></tr>
+  </table>
+</main>
+</body>
+</html>
