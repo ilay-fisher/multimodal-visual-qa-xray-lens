@@ -100,11 +100,14 @@ def ui_layout(defect: bool) -> np.ndarray:
     ink, muted, brand, white = (60, 50, 40), (150, 140, 130), (200, 110, 40), (255, 255, 255)
     rect(img, (0, 0), (W, 64), (70, 45, 30))
     cv2.circle(img, (40, 32), 14, (255, 190, 90), -1, AA)
-    text(img, "Northwind Analytics", (68, 40), 0.7, white, 2)
+    text(img, "Lumen Analytics", (68, 40), 0.7, white, 2)
     text(img, "Overview      Reports      Billing      Settings", (540, 40), 0.5, (235, 225, 215))
     text(img, "Workspace overview", (40, 110), 0.9, ink, 2)
-    cards = [("Active users", "12,480", "Invite team"), ("Monthly revenue", "$48.2k", "View report"),
-             ("Open tickets", "37", "Export report")]  # fmt: skip
+    cards = [
+        ("Active users", "12,480", "Invite team"),
+        ("Monthly revenue", "$48.2k", "View report"),
+        ("Open tickets", "37", "Export report"),
+    ]
     for i, (title, value, action) in enumerate(cards):
         x, y, w, h = 40 + i * 300, 140, 280, 220
         rrect(img, x + 3, y + 5, w, h, 12, (225, 224, 222))  # soft shadow
