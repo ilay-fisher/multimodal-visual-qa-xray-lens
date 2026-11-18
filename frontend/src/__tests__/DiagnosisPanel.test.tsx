@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { DiagnosisPanel, type Diagnosis } from "../components/DiagnosisPanel";
 
 const telemetry = { cvTimeMs: 12.4, pixelsFilteredPct: 97.8, tokenSavingsPct: 97.7 };
@@ -147,6 +147,19 @@ describe("instrument readout", () => {
     expect(document.querySelector(".caret")).toBeNull();
   });
 
+  it("reveals text that arrives in one burst at a readable pace, then settles on result.report", () => {
+    vi.useFakeTimers();
+    const full = '{"defect_category":"missing_component","severity":"critical","confidence":0.92,"visual_evidence":"Pads at U3 are bare.","recommended_action":"Reflow and place the part."}';
+    const { rerender, container } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "" }} telemetry={telemetry} />);
+    rerender(<DiagnosisPanel diagnosis={{ ...done, raw: full }} telemetry={telemetry} />);
+    expect(row("recommended_action")).toHaveAttribute("data-state", "empty");
+    expect(container.querySelector("[aria-busy]")).toHaveAttribute("aria-busy", "true");
+    for (let i = 0; i < 80; i++) act(() => void vi.advanceTimersByTime(16)); // each tick re-arms the next
+    expect(within(row("recommended_action")).getByText("Reflow and place the part.")).toBeInTheDocument();
+    expect(container.querySelector("[aria-busy]")).toHaveAttribute("aria-busy", "false");
+    vi.useRealTimers();
+  });
+
   it("does not announce chunks: the live region stays polite and busy while streaming", () => {
     const { container } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: '{"sev' }} telemetry={telemetry} />);
     const live = container.querySelector("[aria-live]")!;
@@ -174,6 +187,8 @@ describe("specimen flight", () => {
 
   it("flies the sent composite from the clicked region into the specimen slot", () => {
     render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent }} telemetry={telemetry} />);
+    expect(animate).not.toHaveBeenCalled(); // waits for the pixels so the landing rect is real
+    fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
     expect(animate).toHaveBeenCalledTimes(1);
     const [frames, opts] = animate.mock.calls[0];
     expect(frames[0].transform).toBe("translate(-360px, -470px) scale(0.25, 0.3333333333333333)");
@@ -184,10 +199,12 @@ describe("specimen flight", () => {
   it("does not fly under reduced motion or without a source rect", () => {
     media(true);
     const { unmount } = render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent }} telemetry={telemetry} />);
+    fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
     expect(animate).not.toHaveBeenCalled();
     unmount();
     media(false);
     render(<DiagnosisPanel diagnosis={{ status: "streaming", raw: "", sent: { ...sent, from: undefined } }} telemetry={telemetry} />);
+    fireEvent.load(screen.getByAltText("Composite sent to the VLM"));
     expect(animate).not.toHaveBeenCalled();
   });
 });
