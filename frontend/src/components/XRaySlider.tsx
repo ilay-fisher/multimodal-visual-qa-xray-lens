@@ -1,11 +1,13 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { logDebug } from "../lib/log";
-import { labelSide, lockDelays, regionLabel } from "../lib/stagger";
+import { labelSide, lockDelays, placeTinyLabel, regionLabel, TINY } from "../lib/stagger";
 import { useFirstRunSweep, useLensFollow, useReducedMotion, useScanSrc } from "../lib/useLens";
 import type { BoxOut, InspectResponse } from "../types";
 
 const png = (b64: string) => `data:image/png;base64,${b64}`;
 const clamp = (v: number) => Math.min(100, Math.max(0, v));
+/** How long an unstarted sweep may hold the regions back. */
+const IDLE_GRACE_MS = 1200;
 const isHoldKey = (e: React.KeyboardEvent) => (e.key === " " || e.key === "Enter") && !e.repeat;
 
 interface Props {
@@ -33,7 +35,7 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
   const reduced = useReducedMotion();
   const follow = useLensFollow(root, reduced);
   const sweep = useFirstRunSweep(root, reduced, follow, () => valueRef.current);
-  const scanSrc = useScanSrc(png(data.target_png_b64), png(data.overlay_png_b64));
+  const scanSrc = useScanSrc(png(data.target_png_b64), png(data.overlay_png_b64), data.boxes);
   const { image_width: W, image_height: H } = data;
 
   const commit = (v: number) => {
@@ -52,10 +54,37 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
     commit(next);
   };
 
-  const settled = ["done", "cancelled", "skipped"].includes(sweep);
+  // Never hide regions on a stage that is on screen: if the sweep has not started shortly after
+  // mount (no observer callback, off screen), lock on anyway.
+  const [patient, setPatient] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setPatient(true), IDLE_GRACE_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const settled = ["done", "cancelled", "skipped"].includes(sweep) || (sweep === "idle" && patient);
   const delays = lockDelays(data.boxes.length, settled);
   const lock = !delays ? "wait" : reduced ? "rest" : "lock";
   const roiKey = data.boxes.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
+  // Tiny boxes: put the label where there is room and clear of neighbouring brackets (measured, not guessed).
+  useLayoutEffect(() => {
+    const place = () => {
+      const stage = root.current?.querySelector(".stage")?.getBoundingClientRect();
+      const rois = [...(root.current?.querySelectorAll<HTMLElement>(".roi") ?? [])];
+      const rects = rois.map((el) => el.getBoundingClientRect());
+      rois.forEach((el, i) => {
+        const r = rects[i];
+        const lbl = el.querySelector(".lbl")?.getBoundingClientRect();
+        if (!stage || !lbl || !r.width || (r.width >= TINY.w && r.height >= TINY.h)) return;
+        const p = placeTinyLabel(r, { w: lbl.width, h: lbl.height }, rects.filter((_, j) => j !== i), stage);
+        el.dataset.side = p.side;
+        el.style.setProperty("--ny", `${p.dy}px`);
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [roiKey]);
+
   const count = data.boxes.length;
   useEffect(() => {
     if (lock === "lock") logDebug(`lock-on start: ${count} regions`);

@@ -22,3 +22,27 @@ export function labelSide(box: { x: number; w: number }, imageWidth: number): "r
   if ((box.x + box.w) / imageWidth <= 0.68) return "right";
   return box.x / imageWidth >= 0.32 ? "left" : "inside";
 }
+
+export interface Rect { left: number; top: number; right: number; bottom: number }
+
+/** Boxes smaller than this (screen px) get their label placed by measurement. */
+export const TINY = { w: 40, h: 28 };
+
+/**
+ * Label side and vertical nudge (px) for a tiny box, from screen rects: the side with more free
+ * stage, shifted clear of any other region's brackets. `size` is the measured label size.
+ */
+export function placeTinyLabel(box: Rect, size: { w: number; h: number }, others: Rect[], stage: Rect): { side: "left" | "right"; dy: number } {
+  const GAP = 8;
+  const PAD = 4;
+  const side = box.left - stage.left > stage.right - box.right ? "left" : "right";
+  const x0 = side === "right" ? box.right + GAP : box.left - GAP - size.w;
+  const cy = (box.top + box.bottom) / 2;
+  const home = cy - size.h / 2;
+  let top = home;
+  for (const o of others) {
+    const hit = x0 < o.right + PAD && x0 + size.w > o.left - PAD && top < o.bottom + PAD && top + size.h > o.top - PAD;
+    if (hit) top = (o.top + o.bottom) / 2 > cy ? o.top - PAD - size.h : o.bottom + PAD;
+  }
+  return { side, dy: top - home };
+}

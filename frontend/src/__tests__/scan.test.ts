@@ -89,7 +89,7 @@ describe("annotationMask", () => {
   it("covers the number's text area above the box", () => {
     const m = annotationMask(W, H, [box]);
     expect(at(m, 24, 21)).toBe(1); // glyph area: x+1..x+3+10, y-5-12..y-5+3
-    expect(at(m, 24, 14)).toBe(0); // above the glyph
+    expect(at(m, 24, 12)).toBe(0); // above the glyph (y 13..28)
   });
 
   it("clamps the label baseline at 14 for boxes near the top", () => {

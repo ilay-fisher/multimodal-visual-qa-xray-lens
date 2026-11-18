@@ -1,10 +1,12 @@
 /**
  * Machine-vision view of the CV overlay. The backend overlay is the target with a JET heatmap
  * blended in at 55% where the change mask is set, plus white contours and yellow numbered boxes
- * (see cv_pipeline._overlay). We recover each changed pixel's intensity by inverting JET and
+ * (see cv_pipeline._overlay; annotationMask knows their geometry). We recover each changed pixel's intensity by inverting JET and
  * repaint it in the paint colormap over a darkened grayscale base. Done client side on a canvas because
  * CSS filters cannot express a four-stop colormap keyed on hue; the backend stays unchanged.
  */
+
+import type { BoxOut } from "../types";
 
 export type RGB = [number, number, number];
 
@@ -50,8 +52,30 @@ function jetIntensity(r: number, g: number, b: number): number {
   return best / (JET.length - 1);
 }
 
-/** RGBA in, RGBA out: darkened target, with changed pixels repainted by intensity. */
-export function scanPixels(target: Uint8ClampedArray, overlay: Uint8ClampedArray): Uint8ClampedArray {
+/**
+ * Where the backend drew its own annotations (1 = not heat): the 2 px box rectangle (padded one pixel
+ * for anti-aliasing) and the box number, drawn at (x+3, max(14, y-5)) with ~10 px per digit.
+ * Anti-aliased edges of that yellow would otherwise read as heat.
+ */
+export function annotationMask(width: number, height: number, boxes: readonly { x: number; y: number; w: number; h: number }[]): Uint8Array {
+  const mask = new Uint8Array(width * height);
+  const fill = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = Math.max(0, y0); y <= Math.min(height - 1, y1); y++) mask.fill(1, y * width + Math.max(0, x0), y * width + Math.min(width - 1, x1) + 1);
+  };
+  boxes.forEach((b, i) => {
+    const base = Math.max(14, b.y - 5);
+    const digits = String(i + 1).length;
+    fill(b.x - 1, b.y - 1, b.x + b.w + 2, b.y + 2); // top
+    fill(b.x - 1, b.y + b.h - 1, b.x + b.w + 2, b.y + b.h + 2); // bottom
+    fill(b.x - 1, b.y - 1, b.x + 2, b.y + b.h + 2); // left
+    fill(b.x + b.w - 1, b.y - 1, b.x + b.w + 2, b.y + b.h + 2); // right
+    fill(b.x + 1, base - 12, b.x + 3 + 10 * digits, base + 3); // number
+  });
+  return mask;
+}
+
+/** RGBA in, RGBA out: darkened target, with changed pixels repainted by intensity. `mask` (one byte per pixel) forces the plain base. */
+export function scanPixels(target: Uint8ClampedArray, overlay: Uint8ClampedArray, mask?: Uint8Array): Uint8ClampedArray {
   const out = new Uint8ClampedArray(target.length);
   for (let p = 0; p < target.length; p += 4) {
     // Grayscale base: the heat is the only colour on the scan side.
@@ -61,7 +85,7 @@ export function scanPixels(target: Uint8ClampedArray, overlay: Uint8ClampedArray
     const changed = or !== target[p] || og !== target[p + 1] || ob !== target[p + 2];
     const annotation = (or >= 250 && og >= 250 && ob >= 250) || (or >= 250 && og >= 250 && ob <= 5);
     let rgb = base;
-    if (changed && !annotation) {
+    if (changed && !annotation && !mask?.[p / 4]) {
       const heat = [0, 1, 2].map((k) => (overlay[p + k] - (1 - HEAT_ALPHA) * target[p + k]) / HEAT_ALPHA);
       const c = heatColor(MIN_HEAT + (1 - MIN_HEAT) * jetIntensity(heat[0], heat[1], heat[2]));
       rgb = base.map((v, k) => Math.round(v * 0.15 + c[k] * 0.85));
@@ -94,11 +118,11 @@ function pixelsOf(img: HTMLImageElement) {
 }
 
 /** Machine-vision PNG data URL for a target/overlay pair. Rejects if canvas is unavailable. */
-export async function renderScan(targetSrc: string, overlaySrc: string): Promise<string> {
+export async function renderScan(targetSrc: string, overlaySrc: string, boxes: readonly BoxOut[] = []): Promise<string> {
   const [t, o] = await Promise.all([load(targetSrc), load(overlaySrc)]);
   const target = pixelsOf(t);
   const overlay = pixelsOf(o);
-  const out = new ImageData(scanPixels(target.data, overlay.data), target.canvas.width, target.canvas.height);
+  const out = new ImageData(scanPixels(target.data, overlay.data, annotationMask(target.canvas.width, target.canvas.height, boxes)), target.canvas.width, target.canvas.height);
   target.ctx.putImageData(out, 0, 0);
   return target.canvas.toDataURL("image/png");
 }
