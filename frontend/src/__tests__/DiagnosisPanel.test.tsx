@@ -52,4 +52,16 @@ describe("DiagnosisPanel", () => {
     render(<DiagnosisPanel diagnosis={diagnosis} telemetry={telemetry} />);
     expect(screen.getByRole("alert")).toHaveTextContent("Daily cap reached");
   });
+
+  it("shows a thumbnail of the composite sent to the VLM and revokes its URL", () => {
+    const create = vi.fn(() => "blob:sent");
+    const revoke = vi.fn();
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+    const sent = { blob: new Blob(["x"], { type: "image/png" }), width: 108, height: 30 };
+    const { unmount } = render(<DiagnosisPanel diagnosis={{ ...done, sent }} telemetry={telemetry} />);
+    expect(screen.getByText("Sent to VLM: baseline | target, 108 x 30 px")).toBeInTheDocument();
+    expect(screen.getByAltText("Composite sent to the VLM")).toHaveAttribute("src", "blob:sent");
+    unmount();
+    expect(revoke).toHaveBeenCalledWith("blob:sent");
+  });
 });
