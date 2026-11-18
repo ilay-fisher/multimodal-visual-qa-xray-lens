@@ -3,7 +3,7 @@
 import json
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar, Self
 
 import cv2
 import numpy as np
@@ -43,6 +43,12 @@ def make_png(seed: int = 0, size: tuple[int, int] = (64, 48)) -> bytes:
 
 async def collect(client: Any, png: bytes, ctx: str) -> list[str]:
     return [c async for c in client.stream_analyze(png, ctx)]
+
+
+def _fast_demo() -> DemoVLMClient:
+    client = DemoVLMClient()
+    client.delay_s = 0
+    return client
 
 
 def settings(**kw: Any) -> Settings:
@@ -134,7 +140,7 @@ async def test_demo_varies_by_domain() -> None:
 async def test_demo_always_parses_across_inputs() -> None:
     for seed in range(8):
         for ctx in ("pcb", "aerial", "ui", "", "free text"):
-            parse_report("".join(await collect(DemoVLMClient(), make_png(seed), ctx)))
+            parse_report("".join(await collect(_fast_demo(), make_png(seed), ctx)))
 
 
 @pytest.mark.asyncio
@@ -170,13 +176,11 @@ def test_factory_unknown_mode_raises() -> None:
 
 
 def oa_chunk(text: str | None) -> SimpleNamespace:
-    return SimpleNamespace(
-        choices=[SimpleNamespace(delta=SimpleNamespace(content=text))]
-    )
+    return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=text))])
 
 
 class FakeOpenAI:
-    instances: list["FakeOpenAI"] = []
+    instances: ClassVar[list["FakeOpenAI"]] = []
     fail = False
 
     def __init__(self, **kwargs: Any) -> None:
@@ -203,7 +207,7 @@ class FakeAnthropicStream:
     def __init__(self, parts: list[str]) -> None:
         self.parts = parts
 
-    async def __aenter__(self) -> "FakeAnthropicStream":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc: object) -> None:
@@ -219,7 +223,7 @@ class FakeAnthropicStream:
 
 
 class FakeAnthropic:
-    instances: list["FakeAnthropic"] = []
+    instances: ClassVar[list["FakeAnthropic"]] = []
 
     def __init__(self, **kwargs: Any) -> None:
         self.init = kwargs
@@ -316,9 +320,7 @@ async def test_cloud_wraps_errors_without_leaking_key(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     FakeOpenAI.fail = True
-    client = CloudVLMClient(
-        settings(cloud_provider="openai", openai_api_key="sk-secret")
-    )
+    client = CloudVLMClient(settings(cloud_provider="openai", openai_api_key="sk-secret"))
     with pytest.raises(VLMError) as info:
         await collect(client, make_png(), "ui")
     assert "sk-secret" not in str(info.value)
