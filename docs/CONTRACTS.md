@@ -226,3 +226,5 @@ a single PNG with both crops side by side:
   bright/metallic blob, disappearance of dark component body, hue shift to yellow/brown,
   content truncated at an edge) to choose the category. Evidence text is natural language,
   no raw numeric debug stats.
+- Small crops are upscaled before compositing: `s = min(MAX_SCALE=4, max(1, ceil(MIN_SIDE=75 / min(w, h))))`,
+  each crop drawn at (w*s) x (h*s), so the composite is (2*w*s + 8) x (h*s). The 8 px gap is NOT scaled.
