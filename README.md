@@ -17,6 +17,10 @@ live, measured or simulated.
 
 *The X-Ray Lens UI in demo mode (free, simulated diagnosis; latency bars are the measured Haiku 5.5 benchmark).*
 
+![The X-Ray Lens UI with the Cloud engine, a live Claude Haiku 5.5 run](docs/images/xray-lens-live-haiku.png)
+
+*Live run: the same UI with the Cloud engine (Claude Haiku 5.5). The diagnosis, the 1,739 ms call time and the token numbers are tagged `live`.*
+
 ![PCB solder bridge diagnosed by Claude Haiku 5.5](docs/images/haiku-u2.png)
 
 *Live-model example: PCB solder bridge diagnosed by Claude Haiku 5.5 from a 242x75 px composite (a real run, not demo mode).*
@@ -175,6 +179,19 @@ tokens, which is negligible. Demo mode latency is simulated and labelled as such
 | Aerial, irrigation stress | Correct | Correct |
 | UI, clipped button | Correct | Correct |
 | **Total** | **3/4** | **4/4 with upscale** |
+
+#### Live UI check (2026-11-18)
+
+Four regions run through the UI with the Cloud engine (Claude Haiku 5.5):
+
+| Region | Category | Severity | Confidence | Time |
+|---|---|---|---|---|
+| PCB R1 | missing_component | High | 93% | 2,211 ms |
+| PCB R2 (solder bridge, 242x75 composite) | solder_bridge | High | 80% | 2,027 ms |
+| Aerial R1 | irrigation_stress | Medium | 82% | 2,591 ms |
+| UI R1 | clipped_element | High | 90% | 1,739 ms |
+
+All 4 were correct. Total cost was well under $0.01.
 
 The 7B local model is fine for a free demo. Production QA needs a stronger model: Haiku, or a
 larger local model such as Qwen2.5-VL-32B.

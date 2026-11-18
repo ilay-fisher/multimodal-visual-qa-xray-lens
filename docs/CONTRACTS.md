@@ -28,7 +28,7 @@ the manager decides.
 | backend/app/schemas.py + config.py + vlm_client.py | 300 |
 | backend/app/main.py | 200 |
 | backend/app/benchmark.py | 110 |
-| frontend/src (non-test .ts/.tsx, excluding mocks and tests, non-blank lines) | 1,500 (owner decision 2026-11-18) |
+| frontend/src (non-test .ts/.tsx, excluding mocks and tests, non-blank lines) | 1,600 (owner decision 2026-11-18, raised from 1,500) |
 
 ## 1. Dependencies (already pinned by manager)
 

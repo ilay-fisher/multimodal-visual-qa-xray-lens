@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { flipUniform, inView } from "../lib/flip";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { dockPlan, dockStatus } from "../lib/dock";
+import { flipUniform } from "../lib/flip";
 import { partialReport } from "../lib/partialReport";
 import { SPRING_SOFT, springCssClamped } from "../lib/spring";
 import { useReducedMotion } from "../lib/useLens";
 import type { DefectReport, ErrorCode, ResultData } from "../types";
+import { Dock, TRAY_SELECTOR, useDockGate } from "./Dock";
 import { Savings, type Telemetry } from "./Savings";
 
 export interface Diagnosis {
@@ -65,11 +67,23 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
     return () => URL.revokeObjectURL(url);
   }, [sent]);
 
-  /** Specimen has its real size once loaded: invert it onto the clicked region, then spring home. */
-  const fly = (el: HTMLElement) => {
-    const last = el.getBoundingClientRect();
-    if (!sent?.from || reduced || typeof el.animate !== "function" || !inView(last, window.innerWidth, window.innerHeight)) return;
-    const { dx, dy, s } = flipUniform(sent.from, last);
+  const panel = useRef<HTMLElement>(null);
+  const slot = useRef<HTMLDivElement>(null);
+  /** The composite that already flew: a dock that re-appears after scrolling must not replay the flight. */
+  const flown = useRef<unknown>(null);
+  const docked = useDockGate(panel, status !== "idle");
+
+  /**
+   * A specimen image has its real size once loaded: invert it onto the clicked region, then spring home.
+   * `role` is which image this is: the slot's, or the dock's mini specimen. Only the one the plan
+   * picks flies (the slot when it is visible above the dock band, else the dock, else none).
+   */
+  const fly = (el: HTMLElement, role: "slot" | "dock") => {
+    if (!sent?.from || reduced || typeof el.animate !== "function") return;
+    const target = slot.current?.getBoundingClientRect() ?? el.getBoundingClientRect();
+    if (dockPlan(target, document.querySelector(TRAY_SELECTOR)?.getBoundingClientRect(), window.innerWidth, window.innerHeight) !== role || flown.current === sent) return;
+    flown.current = sent;
+    const { dx, dy, s } = flipUniform(sent.from, el.getBoundingClientRect());
     // Overshoot clamped, so the layer lands inside the well instead of past its edge.
     const { easing, durationMs } = springCssClamped(SPRING_SOFT);
     const flight = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }], { duration: durationMs, easing });
@@ -88,7 +102,7 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
   const conf = fields.confidence === undefined ? undefined : Math.round(fields.confidence * 100);
 
   return (
-    <section className="panel diagnosis" aria-live="polite" aria-busy={busy}>
+    <section ref={panel} className="panel diagnosis" aria-live="polite" aria-busy={busy}>
       <header className="panel-head">
         <h2>Diagnosis</h2>
         {result && <span className="chip">{result.backend}</span>}
@@ -96,8 +110,8 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
       </header>
 
       <figure className="sent">
-        <div className="slot" data-filled={Boolean(sent && sentUrl)}>
-          {sent && sentUrl ? <img src={sentUrl} alt="Composite sent to the VLM" onLoad={(e) => fly(e.currentTarget)} /> : <span className="slot-empty">awaiting region</span>}
+        <div ref={slot} className="slot" data-filled={Boolean(sent && sentUrl)}>
+          {sent && sentUrl ? <img src={sentUrl} alt="Composite sent to the VLM" onLoad={(e) => fly(e.currentTarget, "slot")} /> : <span className="slot-empty">awaiting region</span>}
         </div>
         <figcaption>
           <span>Sent to VLM</span>
@@ -149,7 +163,15 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
         </details>
       )}
 
-      <Savings telemetry={telemetry} vlmMs={result?.vlm_time_ms} simulated={simulated} hold={flying} />
+      <Savings telemetry={telemetry} vlmMs={result?.vlm_time_ms} simulated={simulated} hold={flying || (status === "streaming" && !sent)} />
+      {docked && (
+        <Dock
+          url={sentUrl}
+          status={dockStatus(status, result?.report.defect_category)}
+          onTap={() => panel.current?.scrollIntoView?.({ behavior: reduced ? "auto" : "smooth", block: "start" })}
+          onLoad={(img) => fly(img, "dock")}
+        />
+      )}
     </section>
   );
 }
