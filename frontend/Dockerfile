@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # ---- build stage ----
-FROM node:22-alpine AS build
+# Debian slim (glibc): rollup's native parser overflows its small stack on musl/alpine.
+FROM node:22-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
