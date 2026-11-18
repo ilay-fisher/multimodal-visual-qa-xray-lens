@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { flipFrom } from "../lib/flip";
+import { flipUniform, inView } from "../lib/flip";
 import { partialReport } from "../lib/partialReport";
 import { SPRING_SOFT, springCss } from "../lib/spring";
 import { useReducedMotion } from "../lib/useLens";
@@ -70,13 +70,16 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
 
   /** Specimen has its real size once loaded: invert it onto the clicked region, then spring home. */
   const fly = (el: HTMLElement) => {
-    if (!sent?.from || reduced || typeof el.animate !== "function") return;
-    const { dx, dy, sx, sy } = flipFrom(sent.from, el.getBoundingClientRect());
+    const last = el.getBoundingClientRect();
+    if (!sent?.from || reduced || typeof el.animate !== "function" || !inView(last, window.innerWidth, window.innerHeight)) return;
+    const { dx, dy, s } = flipUniform(sent.from, last);
+    // Spring easing with the overshoot clamped, so the layer lands inside the well instead of past its edge.
     const { easing, durationMs } = springCss(SPRING_SOFT);
-    el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` }, { transform: "none" }], { duration: durationMs, easing });
+    const landing = easing.replace(/-?\d*\.?\d+/g, (n) => String(Math.min(Number(n), 1)));
+    el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }], { duration: durationMs, easing: landing });
   };
 
-  const revealed = useRevealed(diagnosis.raw.length, !reduced);
+  const revealed = useRevealed(diagnosis.raw.length, !reduced && simulated);
   const settling = revealed < diagnosis.raw.length;
   const busy = status === "streaming" || settling;
   const partial = useMemo(() => partialReport(diagnosis.raw.slice(0, revealed)), [diagnosis.raw, revealed]);
@@ -101,11 +104,11 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
 
       <figure className="sent">
         <div className="slot" data-filled={Boolean(sent && sentUrl)}>
-          {sent && sentUrl && <img src={sentUrl} alt="Composite sent to the VLM" onLoad={(e) => fly(e.currentTarget)} />}
+          {sent && sentUrl ? <img src={sentUrl} alt="Composite sent to the VLM" onLoad={(e) => fly(e.currentTarget)} /> : <span className="slot-empty">awaiting region</span>}
         </div>
         <figcaption>
           <span>Sent to VLM</span>
-          <b>{sent ? `baseline | target · ${sent.width}×${sent.height} px` : "awaiting a region"}</b>
+          {sent && <b>{`baseline | target · ${sent.width}×${sent.height} px`}</b>}
         </figcaption>
       </figure>
 
