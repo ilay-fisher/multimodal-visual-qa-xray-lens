@@ -201,3 +201,28 @@ ROI crops are made client side with a canvas from `target_png_b64` and sent as P
 `backend/app/logging_config.py`: `configure_logging(level: str = "INFO", fmt: str = "json") -> None`
 JSON formatter (ts, level, logger, msg, request_id if present via contextvar `request_id_var`
 exported from this module, plus `extra` fields). Idempotent.
+
+## 8. Wave 3 change: ROI pair composite (supersedes the roi_image description in section 5)
+
+Live testing showed a VLM that only sees the target crop cannot tell what is *missing*
+(it swapped "missing_component" and "solder_bridge" on the PCB sample). The VLM now gets
+a single PNG with both crops side by side:
+
+```
++-------------+---+-------------+
+|  BASELINE   |gap|   TARGET    |   same box from both images, same w x h
+|   crop      |8px|    crop     |   gap filled with RGB(128,128,128)
++-------------+---+-------------+   total width = 2*w + 8, height = h
+```
+
+- `roi_image` in POST /api/analyze-roi is this composite. Field names are unchanged.
+- Frontend builds it client side from `baseline_png_b64` and `target_png_b64` (src/lib/crop.ts).
+- Backend helper `compose_pair(baseline: np.ndarray, target: np.ndarray, box: BoundingBox) -> np.ndarray`
+  lives in cv_pipeline.py and is used by benchmark.py (benchmark ROI rows use the composite).
+- `build_prompt` explains the layout: left = expected baseline, right = current target; describe
+  what changed from left to right.
+- `roi_tokens` in the result event = `estimate_image_tokens` of the composite size.
+- DemoVLMClient splits the composite at the gap and compares halves (presence of new
+  bright/metallic blob, disappearance of dark component body, hue shift to yellow/brown,
+  content truncated at an edge) to choose the category. Evidence text is natural language,
+  no raw numeric debug stats.
