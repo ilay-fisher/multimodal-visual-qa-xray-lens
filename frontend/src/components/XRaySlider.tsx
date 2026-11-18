@@ -1,4 +1,6 @@
-import { useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { logDebug } from "../lib/log";
+import { labelSide, lockDelays, regionLabel } from "../lib/stagger";
 import { useFirstRunSweep, useLensFollow, useReducedMotion, useScanSrc } from "../lib/useLens";
 import type { BoxOut, InspectResponse } from "../types";
 
@@ -18,6 +20,8 @@ interface Props {
  * decorative and follow its value through a spring (lib/inertia.ts). Hold "baseline" to peek at
  * the reference image. A one-time sweep on first view shows what the lens does.
  * ROI boxes are percentage-positioned buttons above the input so they scale with the image.
+ * Once the sweep has settled they lock on one after another (bracket convergence and the typed
+ * label are CSS, scheduled per region by `--d`); new regions re-key the group so it replays.
  */
 export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
   const [value, setValue] = useState(50);
@@ -48,7 +52,16 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
     commit(next);
   };
 
-  const showHint = ["done", "cancelled", "skipped"].includes(sweep) && !picked && selectedId === null && data.boxes.length > 0;
+  const settled = ["done", "cancelled", "skipped"].includes(sweep);
+  const delays = lockDelays(data.boxes.length, settled);
+  const lock = !delays ? "wait" : reduced ? "rest" : "lock";
+  const roiKey = data.boxes.map((b) => `${b.x},${b.y},${b.w},${b.h}`).join("|");
+  const count = data.boxes.length;
+  useEffect(() => {
+    if (lock === "lock") logDebug(`lock-on start: ${count} regions`);
+  }, [lock, roiKey, count]);
+
+  const showHint = settled && !picked && selectedId === null && data.boxes.length > 0;
 
   return (
     <div ref={root} className="xray" data-sweep={sweep} style={{ "--ar": W / H } as React.CSSProperties}>
@@ -70,7 +83,7 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
           Hold for baseline
         </button>
         {showHint && (
-          <p className="pick-hint" role="status">
+          <p className="pick-hint" role="status" style={{ animationDelay: `${(delays?.at(-1) ?? 0) + 450}ms` }}>
             Pick a region
           </p>
         )}
@@ -113,22 +126,46 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
           <i className="knob" />
         </div>
 
-        {data.boxes.map((b, i) => (
-          <button
-            key={b.id}
-            type="button"
-            className="roi"
-            aria-pressed={selectedId === b.id}
-            aria-label={`Region ${i + 1}, ${b.w} by ${b.h} pixels`}
-            style={{ left: `${(b.x / W) * 100}%`, top: `${(b.y / H) * 100}%`, width: `${(b.w / W) * 100}%`, height: `${(b.h / H) * 100}%` }}
-            onClick={() => {
-              setPicked(true);
-              onSelectBox(b);
-            }}
-          >
-            <span>{i + 1}</span>
-          </button>
-        ))}
+        <Fragment key={roiKey}>
+          {data.boxes.map((b, i) => {
+            const text = regionLabel(i, b.w, b.h);
+            const style = {
+              left: `${(b.x / W) * 100}%`,
+              top: `${(b.y / H) * 100}%`,
+              width: `${(b.w / W) * 100}%`,
+              height: `${(b.h / H) * 100}%`,
+              "--d": `${delays?.[i] ?? 0}ms`,
+              "--n": text.length,
+            } as React.CSSProperties;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                className="roi"
+                data-roi={b.id}
+                data-lock={lock}
+                data-side={labelSide(b, W)}
+                aria-pressed={selectedId === b.id}
+                aria-label={`Region ${i + 1}, ${b.w} by ${b.h} pixels`}
+                style={style}
+                onClick={() => {
+                  setPicked(true);
+                  onSelectBox(b);
+                }}
+              >
+                <span className="brk" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="lbl" aria-hidden="true">
+                  {text}
+                </span>
+              </button>
+            );
+          })}
+        </Fragment>
       </div>
     </div>
   );

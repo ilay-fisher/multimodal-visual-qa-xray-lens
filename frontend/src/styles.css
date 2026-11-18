@@ -61,7 +61,7 @@ body::before {
 }
 button, select, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--paint-hi); outline-offset: 3px; }
-.num, output, dd, .raw, .roi span, .tag, .readout { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num, output, dd, .raw, .roi .lbl, .tag, .readout { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 .app { max-width: 1320px; margin: 0 auto; padding: 18px 16px 40px; display: grid; gap: 16px; }
 
@@ -102,8 +102,8 @@ button, select, input { font: inherit; color: inherit; }
 .sens { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .sens output { color: var(--text); font-size: 12px; width: 4ch; }
 .sens input { -webkit-appearance: none; appearance: none; width: 140px; height: 22px; background: transparent; cursor: pointer; margin: 0; }
-.sens input::-webkit-slider-runnable-track { height: 8px; border-radius: var(--r-pill); box-shadow: var(--recess); background: linear-gradient(90deg, var(--paint-deep) var(--fill, 50%), var(--well) var(--fill, 50%)); }
-.sens input::-moz-range-track { height: 8px; border-radius: var(--r-pill); box-shadow: var(--recess); background: linear-gradient(90deg, var(--paint-deep) var(--fill, 50%), var(--well) var(--fill, 50%)); }
+.sens input::-webkit-slider-runnable-track { height: 8px; border-radius: var(--r-pill); box-shadow: var(--recess); background: linear-gradient(90deg, #3a444e var(--fill, 50%), var(--well) var(--fill, 50%)); }
+.sens input::-moz-range-track { height: 8px; border-radius: var(--r-pill); box-shadow: var(--recess); background: linear-gradient(90deg, #3a444e var(--fill, 50%), var(--well) var(--fill, 50%)); }
 .sens input::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%; border: 0; background: radial-gradient(circle at 32% 28%, #3a444e, #1a2026 70%); box-shadow: var(--rim), 3px 4px 8px rgba(0, 0, 0, 0.55); transition: transform var(--spring-snappy-dur) var(--spring-snappy); }
 .sens input::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; border: 0; background: radial-gradient(circle at 32% 28%, #3a444e, #1a2026 70%); box-shadow: var(--rim), 3px 4px 8px rgba(0, 0, 0, 0.55); }
 .sens input:active::-webkit-slider-thumb { transform: scale(0.955); }
@@ -170,11 +170,37 @@ button, select, input { font: inherit; color: inherit; }
 .pick-hint::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--paint); box-shadow: 0 0 8px var(--paint); }
 @keyframes hint-in { from { opacity: 0; transform: translateX(-14px) scale(0.92); } to { opacity: 1; transform: none; } }
 
-.roi { position: absolute; z-index: 6; padding: 0; background: transparent; border: 0; border-radius: var(--r-sm); box-shadow: inset 0 0 0 2px rgba(236, 232, 223, 0.7); cursor: pointer; transition: background-color 160ms, box-shadow var(--spring-snappy-dur) var(--spring-snappy); }
-.roi span { position: absolute; left: 0; top: 0; transform: translateY(-110%); background: var(--body-hi); box-shadow: var(--rim); font-size: 11px; line-height: 1; padding: 4px 8px; border-radius: var(--r-pill); color: var(--text); }
-.roi:hover, .roi[data-hover] { box-shadow: inset 0 0 0 2px var(--paint); background: var(--paint-soft); }
-.roi[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--paint-hi), 0 0 20px rgba(255, 179, 71, 0.45); background: rgba(255, 179, 71, 0.14); }
-.roi[aria-pressed="true"] span { background: var(--paint-hi); color: #1d1100; }
+/* Regions: four rounded corner brackets (.brk) and a mono label (.lbl). The base rules ARE the
+   settled state (quiet light brackets); data-lock="lock" plays the lock-on once, delayed by --d.
+   Paint colours only for the flash, hover/focus and the pinned region. */
+.roi { position: absolute; z-index: 6; padding: 0; background: transparent; border: 0; border-radius: var(--r-sm); color: rgba(236, 232, 223, 0.7); cursor: pointer; outline: none; transition: background-color 160ms, color 160ms; }
+.roi[data-lock="wait"] { pointer-events: none; }
+.roi[data-lock="wait"] .brk, .roi[data-lock="wait"] .lbl { visibility: hidden; }
+.brk { --bw: 2px; position: absolute; inset: -3px; pointer-events: none; filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)); transition: color 160ms; }
+.brk i { position: absolute; width: min(12px, 30%); height: min(12px, 30%); border: 0 solid currentColor; }
+.brk i:nth-child(1) { left: 0; top: 0; border-width: var(--bw) 0 0 var(--bw); border-top-left-radius: 6px; }
+.brk i:nth-child(2) { right: 0; top: 0; border-width: var(--bw) var(--bw) 0 0; border-top-right-radius: 6px; }
+.brk i:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 var(--bw) var(--bw); border-bottom-left-radius: 6px; }
+.brk i:nth-child(4) { right: 0; bottom: 0; border-width: 0 var(--bw) var(--bw) 0; border-bottom-right-radius: 6px; }
+.lbl { position: absolute; top: 50%; transform: translateY(-50%); padding: 4px 8px; border-radius: var(--r-pill); background: rgba(10, 13, 16, 0.78); box-shadow: var(--rim); color: var(--text); font-size: 10.5px; line-height: 1; white-space: nowrap; pointer-events: none; }
+.roi[data-side="right"] .lbl { left: calc(100% + 8px); }
+.roi[data-side="left"] .lbl { right: calc(100% + 8px); }
+.roi[data-side="inside"] .lbl { left: 10px; top: auto; bottom: 10px; transform: none; }
+.roi:hover, .roi:focus-visible { color: var(--paint-hi); background: rgba(255, 255, 255, 0.035); }
+.roi:focus-visible .brk i { width: min(16px, 38%); height: min(16px, 38%); }
+.roi:hover .lbl, .roi:focus-visible .lbl { color: var(--paint-hi); }
+.roi[aria-pressed="true"] { color: var(--paint-hi); background: rgba(255, 179, 71, 0.07); }
+.roi[aria-pressed="true"] .brk { filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 7px rgba(255, 179, 71, 0.5)); animation: pin var(--spring-snappy-dur) var(--spring-snappy); }
+.roi[aria-pressed="true"] .brk { --bw: 3px; }
+.roi[aria-pressed="true"] .lbl { background: var(--paint-hi); color: #1d1100; font-weight: 600; }
+/* Lock-on: converge from 1.6x with the snappy spring, one flash in paint-hi, label types in 25 ms/char. */
+.roi[data-lock="lock"] .brk { animation: lock-in var(--spring-snappy-dur) var(--spring-snappy) var(--d) backwards, flash 700ms ease-out var(--d) backwards; }
+.roi[data-lock="lock"] .lbl { animation: type calc(var(--n) * 25ms) steps(var(--n)) calc(var(--d) + var(--spring-snappy-dur)) backwards; }
+.roi[data-lock="lock"][aria-pressed="true"] .brk { animation: pin var(--spring-snappy-dur) var(--spring-snappy); }
+@keyframes lock-in { from { transform: scale(1.6); opacity: 0; } 35% { opacity: 1; } }
+@keyframes flash { 0%, 45% { color: var(--paint-hi); filter: drop-shadow(1px 1.5px 2px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 9px rgba(255, 179, 71, 0.95)); } }
+@keyframes pin { from { transform: scale(1.14); } }
+@keyframes type { from { clip-path: inset(0 100% 0 0); } }
 
 /* ---- Readout panel ---- */
 .panel { background: var(--body); border-radius: var(--r-xl); box-shadow: var(--rim), var(--contact); display: grid; gap: 14px; padding: 20px; }
@@ -234,6 +260,7 @@ button, select, input { font: inherit; color: inherit; }
   .legend { left: 10px; top: 10px; padding: 5px 10px; }
   .legend i { display: none; }
   .pick-hint { padding: 5px 12px; font-size: 12px; }
+  .lbl { padding: 3px 6px; font-size: 8.5px; }
   .telemetry dd { font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
