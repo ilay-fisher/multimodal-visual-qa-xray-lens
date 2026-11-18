@@ -73,4 +73,25 @@ describe("Tray", () => {
     expect(p.onUpload).toHaveBeenCalledWith(base, target);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  it("closes sheets on Escape or outside click and returns focus to the opener", async () => {
+    setup();
+    const user = userEvent.setup();
+    const chip = screen.getByRole("button", { name: "+ your pair" });
+    await user.click(chip);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(chip).toHaveFocus();
+
+    const engine = screen.getByRole("button", { name: /engine/i });
+    await user.click(engine);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(engine).toHaveFocus();
+
+    await user.click(engine);
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
 });
