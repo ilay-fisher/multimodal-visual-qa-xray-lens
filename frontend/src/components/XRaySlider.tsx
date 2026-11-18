@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
+import { useFirstRunSweep, useLensFollow, useReducedMotion, useScanSrc } from "../lib/useLens";
 import type { BoxOut, InspectResponse } from "../types";
 
-type Mode = "split" | "lens";
-const LENS_RADIUS = 0.16; // fraction of image width
 const png = (b64: string) => `data:image/png;base64,${b64}`;
-const clamp = (v: number) => Math.min(1, Math.max(0, v));
+const clamp = (v: number) => Math.min(100, Math.max(0, v));
+const isHoldKey = (e: React.KeyboardEvent) => (e.key === " " || e.key === "Enter") && !e.repeat;
 
 interface Props {
   data: InspectResponse;
@@ -13,110 +13,126 @@ interface Props {
 }
 
 /**
- * Target image with a draggable X-Ray lens. Split mode reveals the CV overlay to the
- * left of the handle; lens mode reveals it inside a circle that follows the pointer.
- * ROI boxes are percentage-positioned buttons so they scale with the image.
+ * The lens: a target image with the machine's view (scan) revealed left of a glowing edge.
+ * A native range input spans the stage and owns all input; the knob, rail and edge are
+ * decorative and follow its value through a spring (lib/inertia.ts). Hold "baseline" to peek at
+ * the reference image. A one-time sweep on first view shows what the lens does.
+ * ROI boxes are percentage-positioned buttons above the input so they scale with the image.
  */
 export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
-  const [mode, setMode] = useState<Mode>("split");
-  const [pos, setPos] = useState({ x: 0.5, y: 0.5 });
+  const [value, setValue] = useState(50);
   const [peek, setPeek] = useState(false);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const stage = useRef<HTMLDivElement>(null);
+  const [pressed, setPressed] = useState(false);
+  const [picked, setPicked] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const valueRef = useRef(50);
+  const reduced = useReducedMotion();
+  const follow = useLensFollow(root, reduced);
+  const sweep = useFirstRunSweep(root, reduced, follow, () => valueRef.current);
+  const scanSrc = useScanSrc(png(data.target_png_b64), png(data.overlay_png_b64));
   const { image_width: W, image_height: H } = data;
 
-  const moveTo = (e: React.PointerEvent) => {
-    const r = stage.current?.getBoundingClientRect();
-    if (!r || r.width === 0 || r.height === 0) return;
-    setPos({ x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) });
+  const commit = (v: number) => {
+    valueRef.current = clamp(v);
+    setValue(valueRef.current);
+    follow(valueRef.current);
   };
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    const step = e.shiftKey ? 0.1 : 0.02;
-    const dx = e.key === "ArrowRight" ? step : e.key === "ArrowLeft" ? -step : 0;
-    const dy = mode === "lens" ? (e.key === "ArrowDown" ? step : e.key === "ArrowUp" ? -step : 0) : 0;
-    if (e.key === "Home") setPos((p) => ({ ...p, x: 0 }));
-    else if (e.key === "End") setPos((p) => ({ ...p, x: 1 }));
-    else if (dx || dy) setPos((p) => ({ x: clamp(p.x + dx), y: clamp(p.y + dy) }));
-    else return;
+  const onRangeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === "b" || e.key === "B") return void (!e.repeat && setPeek(true));
+    const next =
+      e.key === "ArrowRight" || e.key === "ArrowUp" ? value + step : e.key === "ArrowLeft" || e.key === "ArrowDown" ? value - step : e.key === "Home" ? 0 : e.key === "End" ? 100 : null;
+    if (next === null) return;
     e.preventDefault();
+    commit(next);
   };
 
-  const clip =
-    mode === "split"
-      ? `inset(0 ${(1 - pos.x) * 100}% 0 0)`
-      : `circle(${LENS_RADIUS * 100}cqw at ${pos.x * 100}% ${pos.y * 100}%)`;
+  const release = () => setPressed(false);
+  const showHint = ["done", "cancelled", "skipped"].includes(sweep) && !picked && selectedId === null && data.boxes.length > 0;
 
   return (
-    <div className="xray">
+    <div ref={root} className="xray" data-sweep={sweep}>
       <div className="xray-bar">
-        <div className="seg" role="group" aria-label="Lens mode">
-          {(["split", "lens"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
-              {m === "split" ? "Split" : "Lens"}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="seg-solo" aria-pressed={peek} onClick={() => setPeek((v) => !v)}>
-          Baseline
+        <button
+          type="button"
+          className="hold"
+          aria-pressed={peek}
+          aria-keyshortcuts="B"
+          onPointerDown={() => setPeek(true)}
+          onPointerUp={() => setPeek(false)}
+          onPointerCancel={() => setPeek(false)}
+          onPointerLeave={() => setPeek(false)}
+          onKeyDown={(e) => isHoldKey(e) && setPeek(true)}
+          onKeyUp={(e) => isHoldKey(e) && setPeek(false)}
+          onBlur={() => setPeek(false)}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          Hold for baseline
         </button>
         <span className="readout">
-          {W} x {H} px | lens {Math.round(pos.x * 100)}%
+          {W} x {H} px | scan {value}%
         </span>
       </div>
 
-      <div
-        ref={stage}
-        className="stage"
-        data-mode={mode}
-        style={{ aspectRatio: `${W} / ${H}` }}
-        onPointerDown={(e) => {
-          setDragging(true);
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-          moveTo(e);
-        }}
-        onPointerMove={(e) => (dragging || (mode === "lens" && e.pointerType === "mouse")) && moveTo(e)}
-        onPointerUp={() => setDragging(false)}
-      >
+      <div className="stage" data-press={pressed || undefined} style={{ aspectRatio: `${W} / ${H}` }}>
         <img src={png(data.target_png_b64)} alt="Target" draggable={false} />
-        <img className="overlay" src={png(data.overlay_png_b64)} alt="CV difference overlay" draggable={false} style={{ clipPath: clip }} />
+        <div className="machine">
+          {scanSrc && <img src={scanSrc} alt="CV difference overlay" draggable={false} />}
+          <span className="legend">
+            <i aria-hidden="true" />
+            CV diff · {Math.round(data.cv_time_ms)} ms
+          </span>
+        </div>
         {peek && <img className="peek" src={png(data.baseline_png_b64)} alt="Baseline" draggable={false} />}
+        {peek && <span className="peek-tag">Baseline</span>}
+        <i className="edge" aria-hidden="true" />
 
-        {mode === "split" ? (
-          <div className="rail" style={{ left: `${pos.x * 100}%` }} />
-        ) : (
-          <div className="ring" style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }} />
-        )}
-        <div
-          className="grip"
-          role="slider"
-          tabIndex={0}
-          aria-label={mode === "split" ? "X-ray split position" : "X-ray lens position"}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(pos.x * 100)}
-          style={{ left: `${pos.x * 100}%`, top: mode === "lens" ? `${pos.y * 100}%` : "50%" }}
-          onKeyDown={onKeyDown}
+        <input
+          className="lens-range"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={value}
+          aria-label="Scan position"
+          aria-valuetext={`Scan ${value}%`}
+          onChange={(e) => commit(Number(e.target.value))}
+          onKeyDown={onRangeKey}
+          onKeyUp={(e) => (e.key === "b" || e.key === "B") && setPeek(false)}
+          onBlur={() => {
+            setPeek(false);
+            release();
+          }}
+          onPointerDown={() => setPressed(true)}
+          onPointerUp={release}
+          onPointerCancel={release}
         />
+        <div className="rail" aria-hidden="true">
+          <i className="knob" />
+        </div>
 
         {data.boxes.map((b, i) => (
           <button
             key={b.id}
             type="button"
             className="roi"
-            data-hover={hovered === b.id || undefined}
             aria-pressed={selectedId === b.id}
             aria-label={`Region ${i + 1}, ${b.w} by ${b.h} pixels`}
             style={{ left: `${(b.x / W) * 100}%`, top: `${(b.y / H) * 100}%`, width: `${(b.w / W) * 100}%`, height: `${(b.h / H) * 100}%` }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerEnter={() => setHovered(b.id)}
-            onPointerLeave={() => setHovered(null)}
-            onClick={() => onSelectBox(b)}
+            onClick={() => {
+              setPicked(true);
+              onSelectBox(b);
+            }}
           >
             <span>{i + 1}</span>
           </button>
         ))}
+        {showHint && (
+          <p className="pick-hint" role="status">
+            Pick a region
+          </p>
+        )}
       </div>
     </div>
   );

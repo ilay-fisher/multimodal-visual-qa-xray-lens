@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { XRaySlider } from "../components/XRaySlider";
 import { inspectFixture } from "./fixtures";
 
@@ -26,7 +25,7 @@ function mockReducedMotion(reduced: boolean) {
 function setup(selectedId: number | null = null) {
   const onSelectBox = vi.fn();
   const view = render(<XRaySlider data={inspectFixture} selectedId={selectedId} onSelectBox={onSelectBox} />);
-  const stage = view.container.querySelector(".stage") as HTMLElement;
+  const stage = view.container.querySelector(".xray") as HTMLElement;
   return { onSelectBox, stage, ...view };
 }
 
@@ -55,9 +54,9 @@ describe("XRaySlider: regions", () => {
     expect(screen.getAllByRole("button", { name: /^Region \d/ })).toHaveLength(2);
   });
 
-  it("calls onSelectBox with the clicked box", async () => {
+  it("calls onSelectBox with the clicked box",  () => {
     const { onSelectBox } = setup();
-    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(screen.getByRole("button", { name: /^Region 2/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Region 2/ }));
     expect(onSelectBox).toHaveBeenCalledWith(inspectFixture.boxes[1]);
   });
 
@@ -98,7 +97,7 @@ describe("XRaySlider: native range", () => {
     const { stage } = setup();
     fireEvent.change(range(), { target: { value: "73" } });
     expect(range()).toHaveAttribute("aria-valuetext", "Scan 73%");
-    expect(stage.querySelector(".knob")).toHaveAttribute("aria-hidden", "true");
+    expect(stage.querySelector(".rail")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("no longer has a circle lens mode", () => {

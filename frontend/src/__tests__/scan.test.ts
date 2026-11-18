@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BASE_DIM, heatColor, scanPixels } from "../lib/scan";
 
-const luma = ([r, g, b]: ArrayLike<number>) => 0.3 * r + 0.59 * g + 0.11 * b;
+const luma = (c: ArrayLike<number>) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
 const px = (...rgb: number[]) => new Uint8ClampedArray([...rgb, 255]);
 /** What the backend writes for a changed pixel: 55% jet colour over 45% target (see cv_pipeline._overlay). */
 const blend = (jet: number[], target: number[]) => px(...jet.map((c, i) => Math.round(0.55 * c + 0.45 * target[i])));
