@@ -1,4 +1,4 @@
-import { BENCHMARK, MIN_SLIVER, barFraction, formatCount, formatSaving, provenance, savingPct } from "../lib/savings";
+import { BENCHMARK, MIN_SLIVER, atProgress, barFraction, formatCount, formatSaving, provenance, savingPct } from "../lib/savings";
 
 describe("barFraction", () => {
   it("is the plain ratio when it is big enough to see", () => {
@@ -70,5 +70,24 @@ describe("constants and counts", () => {
   it("groups thousands", () => {
     expect(formatCount(2460)).toBe("2,460");
     expect(formatCount(121)).toBe("121");
+  });
+});
+
+describe("atProgress", () => {
+  it("starts at the full bar with nothing saved and lands on the true share and saving together", () => {
+    expect(atProgress(2460, 121, 0)).toEqual({ fraction: 1, saving: 0 });
+    const end = atProgress(2460, 121, 1);
+    expect(end.fraction).toBeCloseTo(barFraction(121, 2460), 10);
+    expect(end.saving).toBeCloseTo(savingPct(2460, 121)!, 10);
+  });
+  it("keeps bar and counter in step: the saving shown is the share of the bar already gone", () => {
+    const end = barFraction(121, 2460);
+    for (const p of [0.1, 0.25, 0.5, 0.8]) {
+      const { fraction, saving } = atProgress(2460, 121, p);
+      expect(saving / savingPct(2460, 121)!).toBeCloseTo((1 - fraction) / (1 - end), 10);
+    }
+  });
+  it("is the same mapping for a sliver bar", () => {
+    expect(atProgress(100000, 1, 1).fraction).toBeCloseTo(MIN_SLIVER, 10);
   });
 });

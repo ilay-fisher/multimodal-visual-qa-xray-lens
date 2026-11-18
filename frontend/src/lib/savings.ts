@@ -20,6 +20,12 @@ export function barFraction(value: number | undefined, full: number | undefined)
   return value >= full ? 1 : Math.max(value / full, MIN_SLIVER);
 }
 
+/** Bar length and counter at eased progress p (0..1): one progress drives both, so the bar at fraction f always sits beside the saving 1 - f measured against the final bar, and both land together. */
+export function atProgress(full: number, roi: number, p: number): { fraction: number; saving: number } {
+  const end = barFraction(roi, full);
+  return { fraction: 1 - p * (1 - end), saving: p * (savingPct(full, roi) ?? 0) };
+}
+
 /** Saving in percent, or null when it cannot be told: missing data, full = 0, or regions larger than the frame. */
 export function savingPct(full: number | undefined, roi: number | undefined): number | null {
   if (!ok(full) || !ok(roi) || full === 0 || roi > full) return null;

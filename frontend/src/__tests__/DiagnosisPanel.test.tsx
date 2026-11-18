@@ -316,6 +316,30 @@ describe("savings instrument", () => {
   });
 });
 
+describe("counter and bar share one progress", () => {
+  it("every mid-roll frame reads the saving that matches the bar", async () => {
+    render(<DiagnosisPanel diagnosis={{ status: "idle", raw: "" }} telemetry={telemetry} />);
+    const end = 4.92;
+    const seen: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      const w = parseFloat(document.querySelector<HTMLElement>('[data-bar="tokens-regions"]')!.style.width);
+      const shown = parseFloat(document.querySelector("[data-counter]")!.textContent!);
+      expect(shown).toBeCloseTo(((100 - w) / (100 - end)) * 95.1, 0);
+      seen.push(w);
+      await new Promise((r) => setTimeout(r, 16));
+    }
+    expect(seen.some((w) => w > 10 && w < 90)).toBe(true);
+  });
+
+  it("renders every provenance tag as the same lowercase pill", () => {
+    render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} simulated />);
+    const tags = [...document.querySelectorAll(".tag")].map((t) => t.textContent);
+    expect(tags).toEqual(expect.arrayContaining(["live", "measured", "simulated"]));
+    for (const t of document.querySelectorAll(".savings .pair-head > i, .savings dd > i, .cvline > i")) expect(t).toHaveClass("tag");
+    expect(tags.every((t) => t === t!.toLowerCase())).toBe(true);
+  });
+});
+
 describe("one loud motion at a time", () => {
   const from = { left: 40, top: 30, width: 60, height: 30 } as DOMRect;
   const sent = { blob: new Blob(["x"]), width: 242, height: 75, from };

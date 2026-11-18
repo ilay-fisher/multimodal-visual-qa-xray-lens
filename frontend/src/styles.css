@@ -262,6 +262,7 @@ button, select, input { font: inherit; color: inherit; }
 .call dt { white-space: nowrap; font: 500 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .call dd { margin: 0; font-size: 13px; color: var(--text); white-space: nowrap; }
 .cvline { margin: 0; font: 400 10.5px var(--mono); color: var(--muted); }
+.pair-head .tag { text-transform: none; margin-left: 10px; }
 .cvline .tag { margin-left: 6px; white-space: nowrap; }
 .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 

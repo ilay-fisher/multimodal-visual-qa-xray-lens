@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { logError } from "../lib/log";
-import { BENCHMARK, barFraction, formatCount, formatSaving, provenance, savingPct } from "../lib/savings";
-import { SPRING_SOFT, springCssClamped, springStep, type SpringState } from "../lib/spring";
+import { BENCHMARK, atProgress, barFraction, formatCount, formatSaving, provenance, savingPct } from "../lib/savings";
+import { SPRING_SOFT, springStep, type SpringState } from "../lib/spring";
 import { useReducedMotion } from "../lib/useLens";
 
 export interface Telemetry {
@@ -13,44 +13,37 @@ export interface Telemetry {
 }
 
 /**
- * Drives the one entrance motion: `go` flips the Regions bar from full length to its share (a CSS
- * transition on SPRING_SOFT) and `value` rolls the counter up to `target` on the same spring.
- * Reduced motion, or `still`, shows the final state at once. `hold` delays the start only: a roll
- * already under way is not interrupted.
+ * One eased progress (0..1, SPRING_SOFT, monotone) sets both the Regions bar and the counter, so they
+ * agree at every frame and land together. Reduced motion, or `still`, shows the end state at once;
+ * `hold` only delays the start.
  */
-function useSpringIn(still: boolean, hold: boolean, target: number): { go: boolean; value: number } {
+function useSpringIn(still: boolean, hold: boolean): number {
+  const [p, setP] = useState(still ? 1 : 0);
   const [go, setGo] = useState(still);
-  const [value, setValue] = useState(still ? target : 0);
   const release = !hold || go;
   useEffect(() => {
     if (still) {
-      setGo(true);
-      setValue(target);
+      setP(1);
       return;
     }
     if (!release) return;
+    setGo(true);
     let s: SpringState = { x: 0, v: 0 };
     let last: number | null = null;
-    let top = 0; // the counter only ever rises: no overshoot, and no dip back after it
-    let raf = 0;
+    let top = 0, raf = 0; // top only ever rises: no overshoot, no dip back after it
     const tick = (now: number) => {
-      setGo(true);
-      s = springStep(s, target, last === null ? 0 : (now - last) / 1000, SPRING_SOFT);
+      s = springStep(s, 1, last === null ? 0 : (now - last) / 1000, SPRING_SOFT);
       last = now;
-      const rest = Math.abs(s.x - target) < 0.05 && Math.abs(s.v) < 1;
-      top = Math.max(top, Math.min(target, s.x));
-      setValue(rest ? target : top);
+      const rest = Math.abs(s.x - 1) < 0.001 && Math.abs(s.v) < 0.02;
+      top = Math.max(top, Math.min(1, s.x));
+      setP(rest ? 1 : top);
       if (!rest) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [still, release, target]);
-  return { go, value };
+  }, [still, release]);
+  return p;
 }
-
-/** The bar settles on its true share without dipping past it, on the same spring as the counter. */
-const SETTLE = springCssClamped(SPRING_SOFT);
-const GLIDE = `width ${SETTLE.durationMs}ms ${SETTLE.easing}`;
 
 interface PairProps {
   id: string; title: string; unit: string; tag: string; source?: string;
@@ -63,8 +56,8 @@ interface PairProps {
 function Pair({ id, title, unit, tag, source, full, roi, format, noun, spoken, animated, hold }: PairProps) {
   const reduced = useReducedMotion();
   const saving = savingPct(full, roi);
-  const { go, value } = useSpringIn(reduced || !animated, hold, saving ?? 0);
-  const regions = go ? barFraction(roi, full) : barFraction(full, full);
+  const p = useSpringIn(reduced || !animated, hold);
+  const { fraction: regions, saving: value } = atProgress(full, roi, p);
   const bars: [string, string, number, boolean][] = [
     ["Full frame", format(full), barFraction(full, full), false],
     ["Regions", format(roi), regions, true],
@@ -75,7 +68,7 @@ function Pair({ id, title, unit, tag, source, full, roi, format, noun, spoken, a
         <span>{unit}</span>
         <i className="tag">{tag}</i>
         {saving !== null && (
-          <span className="saved" aria-hidden="true"><b data-counter>{value === saving ? formatSaving(full, roi) : `${value.toFixed(1)}%`}</b> {noun}</span>
+          <span className="saved" aria-hidden="true"><b data-counter>{p === 1 ? formatSaving(full, roi) : `${value.toFixed(1)}%`}</b> {noun}</span>
         )}
         {source && <small>{source}</small>}
       </p>
@@ -83,7 +76,7 @@ function Pair({ id, title, unit, tag, source, full, roi, format, noun, spoken, a
         {bars.map(([label, text, frac, accent]) => (
           <div key={label} className="pair-row">
             <span>{label}</span>
-            <div className="bar"><i data-bar={`${id}-${accent ? "regions" : "full"}`} data-accent={accent || undefined} style={{ width: `${frac * 100}%`, transition: GLIDE }} /></div>
+            <div className="bar"><i data-bar={`${id}-${accent ? "regions" : "full"}`} data-accent={accent || undefined} style={{ width: `${frac * 100}%` }} /></div>
             <b>{text}</b>
           </div>
         ))}
