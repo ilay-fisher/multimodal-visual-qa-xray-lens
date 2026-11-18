@@ -32,6 +32,8 @@ class VLMOutputError(VLMError):
 
 
 class VLMClient(Protocol):
+    """Interface every backend implements: stream raw JSON text chunks."""
+
     name: str
 
     def stream_analyze(self, image_png: bytes, domain_context: str) -> AsyncIterator[str]: ...
@@ -56,6 +58,7 @@ RULES = {
 
 
 def build_prompt(domain_context: str) -> str:
+    """Build the strict JSON-only instruction prompt for a domain."""
     rules = RULES.get(domain_context.strip().lower(), [])
     typical = "; ".join(f"{r.split('|')[0]} ({r.split('|')[2]})" for r in rules)
     hint = (
@@ -92,11 +95,13 @@ def parse_report(raw: str) -> DefectReport:
 
 
 def estimate_image_tokens(width: int, height: int) -> int:
+    """Estimate image tokens with the Anthropic heuristic ceil(w*h/750), minimum 1."""
     return max(1, math.ceil(width * height / 750))
 
 
 class DemoVLMClient:
-    # Deterministic, network-free: image statistics and a content hash pick the defect.
+    """Deterministic, network-free client: image stats and a content hash pick the defect."""
+
     name = "demo"
     delay_s = 0.015
 
@@ -143,7 +148,13 @@ async def _guarded(name: str, stream: AsyncIterator[str]) -> AsyncIterator[str]:
     except VLMError:
         raise
     except Exception as exc:
-        logger.exception("VLM call failed backend=%s error=%s", name, type(exc).__name__)
+        # Tracebacks only at DEBUG: provider 401 messages may echo key fragments.
+        logger.error(
+            "VLM call failed backend=%s error=%s",
+            name,
+            type(exc).__name__,
+            exc_info=logger.isEnabledFor(logging.DEBUG),
+        )
         raise VLMError(f"{name} request failed: {type(exc).__name__}") from exc
     elapsed = (time.perf_counter() - started) * 1e3
     logger.info("VLM call end backend=%s elapsed_ms=%.1f", name, elapsed)
@@ -168,7 +179,8 @@ async def _openai_stream(client: Any, model: str, png: bytes, ctx: str) -> Async
 
 
 class LocalVLMClient:
-    # OpenAI-compatible local server (oMLX, Ollama, vLLM).
+    """Client for an OpenAI-compatible local server (oMLX, Ollama, vLLM)."""
+
     name = "local"
 
     def __init__(self, settings: Settings) -> None:
@@ -185,7 +197,8 @@ class LocalVLMClient:
 
 
 class CloudVLMClient:
-    # Hosted VLM through the Anthropic or OpenAI SDK.
+    """Hosted VLM client using the Anthropic or OpenAI SDK."""
+
     def __init__(self, settings: Settings) -> None:
         self.provider = settings.cloud_provider
         self.name = f"cloud:{self.provider}"
@@ -225,6 +238,7 @@ class CloudVLMClient:
 
 
 def get_vlm_client(mode: str, settings: Settings) -> VLMClient:
+    """Return the client for demo, local or cloud mode; raise VLMError otherwise."""
     if mode == "demo":
         return DemoVLMClient()
     if mode in ("local", "cloud"):

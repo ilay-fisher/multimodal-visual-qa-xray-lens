@@ -11,6 +11,8 @@ DEFAULT_SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
 
 
 class Settings(BaseSettings):
+    """Runtime configuration, read from environment variables and an optional .env file."""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     vlm_mode: Literal["demo", "local", "cloud"] = "demo"
@@ -41,4 +43,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return the process-wide cached Settings instance."""
     return Settings()

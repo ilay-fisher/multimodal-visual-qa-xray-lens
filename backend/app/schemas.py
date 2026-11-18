@@ -1,11 +1,13 @@
 """Pydantic models shared by the VLM client and the HTTP API."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
+    """Defect severity levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -25,6 +27,8 @@ class DefectReport(BaseModel):
 
 
 class BoxOut(BaseModel):
+    """One detected region with its estimated VLM token cost."""
+
     id: int
     x: int
     y: int
@@ -35,6 +39,8 @@ class BoxOut(BaseModel):
 
 
 class InspectResponse(BaseModel):
+    """Response of the inspect endpoint."""
+
     preset_id: str | None
     image_width: int
     image_height: int
@@ -50,6 +56,8 @@ class InspectResponse(BaseModel):
 
 
 class PresetOut(BaseModel):
+    """A sample preset exposed to the UI."""
+
     id: str
     label: str
     domain_context: str

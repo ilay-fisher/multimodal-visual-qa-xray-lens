@@ -1,6 +1,7 @@
 """Tests for prompt building, parsing, and the demo/local/cloud VLM clients (no network)."""
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from typing import Any, ClassVar, Self
@@ -325,3 +326,14 @@ async def test_cloud_wraps_errors_without_leaking_key(
         await collect(client, make_png(), "ui")
     assert "sk-secret" not in str(info.value)
     assert "sk-secret" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_failure_logs_no_traceback_at_info(caplog: pytest.LogCaptureFixture) -> None:
+    FakeOpenAI.fail = True
+    caplog.set_level(logging.INFO)
+    with pytest.raises(VLMError):
+        await collect(LocalVLMClient(settings()), make_png(), "ui")
+    assert "VLM call failed" in caplog.text
+    assert "Traceback" not in caplog.text
+    assert not any(r.exc_info for r in caplog.records)
