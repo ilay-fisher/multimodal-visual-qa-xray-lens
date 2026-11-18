@@ -63,8 +63,10 @@ def pcb_board(defect: bool) -> np.ndarray:
             for dx in (-24, 24):
                 rect(img, (px + dx - 5, py - 12), (px + dx + 5, py + 12), silver)
         text(img, f"R{i + 1}", (px - 14, py + 34), 0.4, (230, 235, 235))
-    if defect:  # solder bridge across two adjacent pads on the top row of U2
-        cv2.ellipse(img, (387, 252), (19, 13), 0, 0, 360, silver, -1, AA)
+    if defect:  # solder bridge: narrow gray metal blob across the gap between two U2 pins
+        cv2.ellipse(img, (383, 252), (12, 5), 12, 0, 360, (110, 115, 120), -1, AA)  # darker rim
+        cv2.ellipse(img, (382, 251), (9, 3), 12, 0, 360, (178, 182, 186), -1, AA)
+        cv2.circle(img, (379, 250), 1, (240, 243, 245), -1, AA)  # specular highlight
     return img
 
 
