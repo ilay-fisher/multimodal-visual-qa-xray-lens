@@ -117,11 +117,11 @@ Set `VLM_MODE` in `backend/.env`:
 For cloud mode, create a dedicated Anthropic workspace with its own spend limit and take the
 key from that workspace.
 
-Tests and linters:
+Tests and linters (from the repo root):
 
 ```bash
-cd backend && python -m pytest -q && ruff check . && mypy app
-cd frontend && npm test && npm run lint && npm run typecheck
+(cd backend && python -m pytest -q && ruff check . && mypy app)
+(cd frontend && npm test && npm run lint && npm run typecheck)
 ```
 
 Benchmark (from `backend/`, with the virtualenv active):
