@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { logError } from "../lib/log";
 import { BENCHMARK, barFraction, formatCount, formatSaving, provenance, savingPct } from "../lib/savings";
-import { SPRING_SOFT, springStep, type SpringState } from "../lib/spring";
+import { SPRING_SOFT, springCssClamped, springStep, type SpringState } from "../lib/spring";
 import { useReducedMotion } from "../lib/useLens";
 
 export interface Telemetry {
@@ -37,7 +37,7 @@ function useSpringIn(still: boolean, hold: boolean, target: number): { go: boole
       s = springStep(s, target, last === null ? 0 : (now - last) / 1000, SPRING_SOFT);
       last = now;
       const rest = Math.abs(s.x - target) < 0.05 && Math.abs(s.v) < 1;
-      setValue(rest ? target : Math.min(100, Math.max(0, s.x)));
+      setValue(rest ? target : Math.min(target, Math.max(0, s.x)));
       if (!rest) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -45,6 +45,10 @@ function useSpringIn(still: boolean, hold: boolean, target: number): { go: boole
   }, [still, release, target]);
   return { go, value };
 }
+
+/** The bar settles on its true share without dipping past it, on the same spring as the counter. */
+const SETTLE = springCssClamped(SPRING_SOFT);
+const GLIDE = `width ${SETTLE.durationMs}ms ${SETTLE.easing}`;
 
 interface PairProps {
   id: string; title: string; unit: string; tag: string; source?: string;
@@ -68,19 +72,19 @@ function Pair({ id, title, unit, tag, source, full, roi, format, noun, spoken, a
       <p className="pair-head">
         <span>{unit}</span>
         <i className="tag">{tag}</i>
+        {saving !== null && (
+          <span className="saved" aria-hidden="true"><b data-counter>{value === saving ? formatSaving(full, roi) : `${value.toFixed(1)}%`}</b> {noun}</span>
+        )}
         {source && <small>{source}</small>}
       </p>
       <div aria-hidden="true">
         {bars.map(([label, text, frac, accent]) => (
           <div key={label} className="pair-row">
             <span>{label}</span>
-            <div className="bar"><i data-bar={`${id}-${accent ? "regions" : "full"}`} data-accent={accent || undefined} style={{ width: `${frac * 100}%` }} /></div>
+            <div className="bar"><i data-bar={`${id}-${accent ? "regions" : "full"}`} data-accent={accent || undefined} style={{ width: `${frac * 100}%`, transition: GLIDE }} /></div>
             <b>{text}</b>
           </div>
         ))}
-        {saving !== null && (
-          <p className="saved"><b data-counter>{value === saving ? formatSaving(full, roi) : `${value.toFixed(1)}%`}</b> {noun}</p>
-        )}
       </div>
       <p className="sr">{spoken}</p>
     </section>
@@ -106,29 +110,17 @@ export function Savings({ telemetry, vlmMs, simulated, hold }: { telemetry: Tele
       {hasTokens && (
         <Pair
           key={`${full}:${roi}`}
-          id="tokens"
-          title="Image tokens"
-          unit="est. tokens"
-          tag={provenance("estimate", simulated)}
-          full={full}
-          roi={roi}
-          format={formatCount}
-          noun="fewer"
+          id="tokens" title="Image tokens" unit="est. tokens" tag={provenance("estimate", simulated)}
+          full={full} roi={roi} format={formatCount} noun="fewer"
           spoken={`Full frame ${formatCount(full)} est. tokens, regions ${formatCount(roi)}${tokenSaving ? `, ${tokenSaving} fewer` : ""}`}
           animated
           hold={hold}
         />
       )}
       <Pair
-        id="latency"
-        title="Latency"
-        unit="ms"
-        tag={provenance("benchmark", simulated)}
+        id="latency" title="Latency" unit="latency · ms" tag={provenance("benchmark", simulated)}
         source={`benchmark · ${BENCHMARK.model} · ${BENCHMARK.regions} regions`}
-        full={BENCHMARK.fullMs}
-        roi={BENCHMARK.roiMs}
-        format={formatCount}
-        noun="saved"
+        full={BENCHMARK.fullMs} roi={BENCHMARK.roiMs} format={formatCount} noun="saved"
         spoken={`Full frame ${formatCount(BENCHMARK.fullMs)} ms, regions ${formatCount(BENCHMARK.roiMs)} ms, ${latencySaving} faster. Measured benchmark, ${BENCHMARK.model}, ${BENCHMARK.regions} regions.`}
         animated={false}
         hold={hold}

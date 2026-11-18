@@ -251,17 +251,18 @@ button, select, input { font: inherit; color: inherit; }
 .pair + .pair { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .pair-head { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 0; margin: 0; font: 500 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .pair-head small { flex-basis: 100%; font: 400 10.5px var(--mono); letter-spacing: 0.02em; text-transform: none; }
-.pair-row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 7ch; align-items: center; gap: 10px; min-height: 22px; font: 500 11px var(--mono); color: var(--muted); }
+.pair-row { display: grid; grid-template-columns: 82px minmax(0, 1fr) 7ch; align-items: center; gap: 10px; min-height: 22px; white-space: nowrap; font: 500 11px var(--mono); color: var(--muted); }
 .pair-row b { font-weight: 500; font-size: 13px; color: var(--text); text-align: right; }
-.pair .bar i { background: rgba(236, 232, 223, 0.34); transition: width var(--spring-soft-dur) var(--spring-soft); }
+.pair .bar i { background: rgba(236, 232, 223, 0.34); }
 .pair .bar i[data-accent] { background: linear-gradient(90deg, var(--paint-deep), var(--paint)); }
-.saved { margin: 4px 0 0; text-align: right; font: 400 11px var(--mono); color: var(--muted); }
+.saved { margin-left: auto; font: 400 11px var(--mono); letter-spacing: 0.02em; text-transform: none; color: var(--muted); }
 .saved b { font-weight: 500; font-size: 15px; color: var(--text); }
 .call { margin: 0; }
 .call div { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.call dt { font: 500 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.call dt { white-space: nowrap; font: 500 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .call dd { margin: 0; font-size: 13px; color: var(--text); white-space: nowrap; }
-.cvline { margin: 0; font: 400 11px var(--mono); color: var(--muted); }
+.cvline { margin: 0; font: 400 10.5px var(--mono); color: var(--muted); }
+.cvline .tag { margin-left: 6px; white-space: nowrap; }
 .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 @media (max-width: 960px) {
@@ -286,7 +287,11 @@ button, select, input { font: inherit; color: inherit; }
   .legend i { display: none; }
   .pick-hint { padding: 5px 12px; font-size: 12px; }
   .lbl { padding: 3px 6px; font-size: 8.5px; }
-  .pair-row { grid-template-columns: 62px minmax(0, 1fr) 6ch; gap: 8px; }
+  .savings { padding: 14px 12px; }
+  .pair-head { letter-spacing: 0.04em; font-size: 10px; row-gap: 4px; }
+  .tag { margin-left: 6px; }
+  .cvline { font-size: 10px; white-space: nowrap; }
+  .pair-row { grid-template-columns: 76px minmax(0, 1fr) 6ch; gap: 8px; }
   .row { grid-template-columns: 82px minmax(0, 1fr); gap: 10px; }
   .row dt { font-size: 10px; letter-spacing: 0.05em; }
   .panel { padding: 16px; }

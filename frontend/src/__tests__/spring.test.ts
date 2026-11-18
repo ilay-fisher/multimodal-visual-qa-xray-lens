@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SPRING_SNAPPY, SPRING_SOFT, springCss, springStep, springTrajectory, type SpringState } from "../lib/spring";
+import { SPRING_SNAPPY, SPRING_SOFT, springCss, springCssClamped, springStep, springTrajectory, type SpringState } from "../lib/spring";
 
 const peak = (xs: number[]) => Math.max(...xs);
 
@@ -62,5 +62,14 @@ describe("springCss", () => {
   it("contains values above 1 (overshoot)", () => {
     const nums = springCss(SPRING_SOFT).easing.slice(7, -1).split(", ").map(Number);
     expect(peak(nums)).toBeGreaterThan(1.04);
+  });
+});
+
+describe("springCssClamped", () => {
+  const nums = (css: string) => css.slice(7, -1).split(", ").map(Number);
+  it("keeps the spring's timing but never passes the target", () => {
+    const clamped = springCssClamped(SPRING_SOFT);
+    expect(clamped.durationMs).toBe(springCss(SPRING_SOFT).durationMs);
+    expect(peak(nums(clamped.easing))).toBe(1);
   });
 });

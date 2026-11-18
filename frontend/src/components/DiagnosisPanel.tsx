@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { flipUniform, inView } from "../lib/flip";
 import { partialReport } from "../lib/partialReport";
-import { SPRING_SOFT, springCss } from "../lib/spring";
+import { SPRING_SOFT, springCssClamped } from "../lib/spring";
 import { useReducedMotion } from "../lib/useLens";
 import type { DefectReport, ErrorCode, ResultData } from "../types";
 import { Savings, type Telemetry } from "./Savings";
@@ -70,10 +70,9 @@ export function DiagnosisPanel({ diagnosis, telemetry, simulated = false }: { di
     const last = el.getBoundingClientRect();
     if (!sent?.from || reduced || typeof el.animate !== "function" || !inView(last, window.innerWidth, window.innerHeight)) return;
     const { dx, dy, s } = flipUniform(sent.from, last);
-    // Spring easing with the overshoot clamped, so the layer lands inside the well instead of past its edge.
-    const { easing, durationMs } = springCss(SPRING_SOFT);
-    const landing = easing.replace(/-?\d*\.?\d+/g, (n) => String(Math.min(Number(n), 1)));
-    const flight = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }], { duration: durationMs, easing: landing });
+    // Overshoot clamped, so the layer lands inside the well instead of past its edge.
+    const { easing, durationMs } = springCssClamped(SPRING_SOFT);
+    const flight = el.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }, { transform: "none" }], { duration: durationMs, easing });
     if (!flight) return;
     setFlying(true);
     flight.onfinish = flight.oncancel = () => setFlying(false);
