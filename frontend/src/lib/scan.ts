@@ -2,13 +2,13 @@
  * Machine-vision view of the CV overlay. The backend overlay is the target with a JET heatmap
  * blended in at 55% where the change mask is set, plus white contours and yellow numbered boxes
  * (see cv_pipeline._overlay). We recover each changed pixel's intensity by inverting JET and
- * repaint it in the paint colormap over a darkened base. Done client side on a canvas because
+ * repaint it in the paint colormap over a darkened grayscale base. Done client side on a canvas because
  * CSS filters cannot express a four-stop colormap keyed on hue; the backend stays unchanged.
  */
 
 export type RGB = [number, number, number];
 
-/** Target brightness on the scan side. */
+/** Target brightness on the scan side (after desaturating to grey). */
 export const BASE_DIM = 0.35;
 const HEAT_ALPHA = 0.55; // mirrors _HEATMAP_ALPHA in cv_pipeline.py
 const MIN_HEAT = 0.25; // any masked pixel is at least this visible
@@ -54,7 +54,9 @@ function jetIntensity(r: number, g: number, b: number): number {
 export function scanPixels(target: Uint8ClampedArray, overlay: Uint8ClampedArray): Uint8ClampedArray {
   const out = new Uint8ClampedArray(target.length);
   for (let p = 0; p < target.length; p += 4) {
-    const base = [0, 1, 2].map((k) => Math.round(target[p + k] * BASE_DIM));
+    // Grayscale base: the heat is the only colour on the scan side.
+    const grey = Math.round((0.299 * target[p] + 0.587 * target[p + 1] + 0.114 * target[p + 2]) * BASE_DIM);
+    const base = [grey, grey, grey];
     const [or, og, ob] = [overlay[p], overlay[p + 1], overlay[p + 2]];
     const changed = or !== target[p] || og !== target[p + 1] || ob !== target[p + 2];
     const annotation = (or >= 250 && og >= 250 && ob >= 250) || (or >= 250 && og >= 250 && ob <= 5);
@@ -88,7 +90,7 @@ function pixelsOf(img: HTMLImageElement) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("2d canvas unavailable");
   ctx.drawImage(img, 0, 0);
-  return { data: ctx.getImageData(0, 0, canvas.width, canvas.height), ctx, canvas };
+  return { data: ctx.getImageData(0, 0, canvas.width, canvas.height).data, ctx, canvas };
 }
 
 /** Machine-vision PNG data URL for a target/overlay pair. Rejects if canvas is unavailable. */
@@ -96,7 +98,7 @@ export async function renderScan(targetSrc: string, overlaySrc: string): Promise
   const [t, o] = await Promise.all([load(targetSrc), load(overlaySrc)]);
   const target = pixelsOf(t);
   const overlay = pixelsOf(o);
-  const out = new ImageData(scanPixels(target.data.data, overlay.data.data), target.canvas.width, target.canvas.height);
+  const out = new ImageData(scanPixels(target.data, overlay.data), target.canvas.width, target.canvas.height);
   target.ctx.putImageData(out, 0, 0);
   return target.canvas.toDataURL("image/png");
 }

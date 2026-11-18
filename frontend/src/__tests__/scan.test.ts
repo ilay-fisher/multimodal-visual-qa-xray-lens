@@ -34,7 +34,7 @@ describe("heatColor", () => {
 describe("scanPixels", () => {
   const target = [100, 100, 100];
 
-  it("darkens unchanged pixels to the base level", () => {
+  it("desaturates and darkens unchanged pixels to the base level", () => {
     const out = scanPixels(px(...target), px(...target));
     expect(BASE_DIM).toBe(0.35);
     expect([...out]).toEqual([35, 35, 35, 255]);
@@ -57,10 +57,15 @@ describe("scanPixels", () => {
     expect([...yellow]).toEqual([35, 35, 35, 255]);
   });
 
+  it("has no colour on unchanged coloured pixels", () => {
+    const [r, g, b] = scanPixels(px(200, 40, 20), px(200, 40, 20));
+    expect(r === g && g === b).toBe(true);
+  });
+
   it("works on whole images, one pixel per four bytes", () => {
     const t = new Uint8ClampedArray([100, 100, 100, 255, 10, 20, 30, 255]);
     const out = scanPixels(t, t);
     expect(out).toHaveLength(8);
-    expect([...out.slice(4)]).toEqual([4, 7, 11, 255]);
+    expect([...out.slice(4)]).toEqual([6, 6, 6, 255]); // grey: 0.299*10 + 0.587*20 + 0.114*30, times 0.35
   });
 });

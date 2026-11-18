@@ -63,20 +63,16 @@ export function useLensFollow(host: RefObject<HTMLElement>, reduced: boolean, in
   );
 }
 
-const seen = () => {
+/** True if the sweep already ran this session; marks it as run otherwise. Storage may be blocked: then it just runs. */
+function seenThenMark(): boolean {
   try {
-    return sessionStorage.getItem(SWEEP_FLAG) !== null;
-  } catch {
-    return false;
-  }
-};
-const markSeen = () => {
-  try {
+    if (sessionStorage.getItem(SWEEP_FLAG) !== null) return true;
     sessionStorage.setItem(SWEEP_FLAG, "1");
   } catch {
-    /* storage blocked: the sweep simply may run again next load */
+    /* blocked */
   }
-};
+  return false;
+}
 
 /**
  * Runs the guided sweep once per session, the first time `host` scrolls into view. Any pointer,
@@ -115,8 +111,7 @@ export function useFirstRunSweep(host: RefObject<HTMLElement>, reduced: boolean,
       else raf = requestAnimationFrame(frame);
     };
     const start = () => {
-      if (seen()) return setState("skipped");
-      markSeen();
+      if (seenThenMark()) return setState("skipped");
       logDebug("sweep running");
       setState("running");
       inputs.forEach((e) => el.addEventListener(e, cancel, true));

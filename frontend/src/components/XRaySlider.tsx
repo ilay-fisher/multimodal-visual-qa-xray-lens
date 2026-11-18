@@ -48,11 +48,10 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
     commit(next);
   };
 
-  const release = () => setPressed(false);
   const showHint = ["done", "cancelled", "skipped"].includes(sweep) && !picked && selectedId === null && data.boxes.length > 0;
 
   return (
-    <div ref={root} className="xray" data-sweep={sweep}>
+    <div ref={root} className="xray" data-sweep={sweep} style={{ "--ar": W / H } as React.CSSProperties}>
       <div className="xray-bar">
         <button
           type="button"
@@ -70,6 +69,11 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
         >
           Hold for baseline
         </button>
+        {showHint && (
+          <p className="pick-hint" role="status">
+            Pick a region
+          </p>
+        )}
         <span className="readout">
           {W} x {H} px | scan {value}%
         </span>
@@ -100,13 +104,10 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
           onChange={(e) => commit(Number(e.target.value))}
           onKeyDown={onRangeKey}
           onKeyUp={(e) => (e.key === "b" || e.key === "B") && setPeek(false)}
-          onBlur={() => {
-            setPeek(false);
-            release();
-          }}
+          onBlur={() => (setPeek(false), setPressed(false))}
           onPointerDown={() => setPressed(true)}
-          onPointerUp={release}
-          onPointerCancel={release}
+          onPointerUp={() => setPressed(false)}
+          onPointerCancel={() => setPressed(false)}
         />
         <div className="rail" aria-hidden="true">
           <i className="knob" />
@@ -128,11 +129,6 @@ export function XRaySlider({ data, selectedId, onSelectBox }: Props) {
             <span>{i + 1}</span>
           </button>
         ))}
-        {showHint && (
-          <p className="pick-hint" role="status">
-            Pick a region
-          </p>
-        )}
       </div>
     </div>
   );
