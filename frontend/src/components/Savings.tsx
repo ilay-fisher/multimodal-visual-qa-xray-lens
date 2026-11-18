@@ -31,13 +31,15 @@ function useSpringIn(still: boolean, hold: boolean, target: number): { go: boole
     if (!release) return;
     let s: SpringState = { x: 0, v: 0 };
     let last: number | null = null;
+    let top = 0; // the counter only ever rises: no overshoot, and no dip back after it
     let raf = 0;
     const tick = (now: number) => {
       setGo(true);
       s = springStep(s, target, last === null ? 0 : (now - last) / 1000, SPRING_SOFT);
       last = now;
       const rest = Math.abs(s.x - target) < 0.05 && Math.abs(s.v) < 1;
-      setValue(rest ? target : Math.min(target, Math.max(0, s.x)));
+      top = Math.max(top, Math.min(target, s.x));
+      setValue(rest ? target : top);
       if (!rest) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

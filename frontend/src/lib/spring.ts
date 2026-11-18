@@ -61,10 +61,14 @@ export function springCss(cfg: SpringConfig, points = 32): { easing: string; dur
   return { easing: `linear(${samples.join(", ")})`, durationMs: Math.round(times[last] * 1000) };
 }
 
-/** Like `springCss` but the overshoot is clamped to the target: for things that must never pass their true value (a bar that would dip below its real share). */
+/**
+ * Like `springCss` but monotone: it rises to the target and stays there. The overshoot is clamped and
+ * the dip after it is flattened, for things that must never pass (or fall back from) their true value.
+ */
 export function springCssClamped(cfg: SpringConfig): { easing: string; durationMs: number } {
   const { easing, durationMs } = springCss(cfg);
-  return { easing: easing.replace(/-?\d*\.?\d+/g, (n) => String(Math.min(Number(n), 1))), durationMs };
+  let top = 0;
+  return { easing: easing.replace(/-?\d*\.?\d+/g, (n) => String((top = Math.max(top, Math.min(Number(n), 1))))), durationMs };
 }
 
 /** Publishes `--spring-soft/-dur` and `--spring-snappy/-dur` on the element (the root at startup). */

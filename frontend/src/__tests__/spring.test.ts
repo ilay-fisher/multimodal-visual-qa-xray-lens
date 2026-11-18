@@ -67,9 +67,11 @@ describe("springCss", () => {
 
 describe("springCssClamped", () => {
   const nums = (css: string) => css.slice(7, -1).split(", ").map(Number);
-  it("keeps the spring's timing but never passes the target", () => {
+  it("keeps the spring's timing, rises to the target and stays there", () => {
     const clamped = springCssClamped(SPRING_SOFT);
     expect(clamped.durationMs).toBe(springCss(SPRING_SOFT).durationMs);
-    expect(peak(nums(clamped.easing))).toBe(1);
+    const xs = nums(clamped.easing);
+    expect(peak(xs)).toBe(1);
+    expect(xs.every((x, i) => i === 0 || x >= xs[i - 1])).toBe(true);
   });
 });
