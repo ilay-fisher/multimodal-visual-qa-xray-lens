@@ -22,6 +22,22 @@ const done: Diagnosis = {
 };
 
 describe("DiagnosisPanel", () => {
+  it("tags the VLM time as simulated in demo mode only", () => {
+    const { rerender } = render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} simulated />);
+    expect(screen.getByText("simulated")).toBeInTheDocument();
+    rerender(<DiagnosisPanel diagnosis={done} telemetry={telemetry} simulated={false} />);
+    expect(screen.queryByText("simulated")).not.toBeInTheDocument();
+  });
+
+  it("keeps the sent-to-VLM caption short enough for one line", () => {
+    const sent = { blob: new Blob(["x"]), width: 242, height: 75 };
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    render(<DiagnosisPanel diagnosis={{ ...done, sent }} telemetry={telemetry} />);
+    expect(screen.getByText("Sent to VLM")).toBeInTheDocument();
+    expect(screen.getByText(/^baseline \| target/)).toHaveTextContent("baseline | target · 242×75 px");
+  });
+
   it("renders the parsed report with severity, confidence and cached flag", () => {
     render(<DiagnosisPanel diagnosis={done} telemetry={telemetry} />);
     expect(screen.getByText("missing_component")).toBeInTheDocument();
@@ -59,7 +75,7 @@ describe("DiagnosisPanel", () => {
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
     const sent = { blob: new Blob(["x"], { type: "image/png" }), width: 108, height: 30 };
     const { unmount } = render(<DiagnosisPanel diagnosis={{ ...done, sent }} telemetry={telemetry} />);
-    expect(screen.getByText("Sent to VLM: baseline | target, 108 x 30 px")).toBeInTheDocument();
+    expect(screen.getByText("baseline | target · 108×30 px")).toBeInTheDocument();
     expect(screen.getByAltText("Composite sent to the VLM")).toHaveAttribute("src", "blob:sent");
     unmount();
     expect(revoke).toHaveBeenCalledWith("blob:sent");
