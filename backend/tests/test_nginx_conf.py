@@ -17,13 +17,15 @@ def zones(kind: str) -> dict[str, str]:
     return {m.group(2): m.group(0) for m in re.finditer(pattern, CONF, re.M)}
 
 
-def location_block(selector: str) -> str:
-    """Return the body of the first `location ... {` whose header contains `selector`."""
-    match = re.search(
-        r"location\s+[^{]*" + re.escape(selector) + r"[^{]*\{(.*?)\n    \}", CONF, re.S
-    )
-    assert match, f"no location containing {selector!r}"
-    return match.group(1)
+def location_block(path: str) -> str:
+    """Body of the location nginx would pick for `path` (regex beats prefix, as in nginx)."""
+    locations = re.findall(r"location\s+([^{]*?)\s*\{(.*?)\n    \}", CONF, re.S)
+    for header, body in locations:
+        if header.startswith("~") and re.search(header.lstrip("~* "), path):
+            return body
+    prefixes = [(h, b) for h, b in locations if not h.startswith("~") and path.startswith(h)]
+    assert prefixes, f"no location matches {path!r}"
+    return max(prefixes, key=lambda hb: len(hb[0]))[1]
 
 
 def test_request_zones_keyed_on_client_ip() -> None:
@@ -54,7 +56,7 @@ def test_expensive_endpoints_use_strict_zone() -> None:
 def test_generic_api_uses_loose_zone() -> None:
     req = zones("limit_req_zone")
     loose = max(req, key=lambda n: int(re.search(r"rate=(\d+)", req[n]).group(1)))  # type: ignore[union-attr]
-    assert f"limit_req zone={loose}" in location_block("/api/")
+    assert f"limit_req zone={loose}" in location_block("/api/health")
 
 
 def test_connection_limit_per_ip() -> None:
